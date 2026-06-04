@@ -21,10 +21,12 @@ everyone talking to you in one stream.
             └──────────────┘
 ```
 
-**Build status:** Steps 1–3 complete — **Twitch** is fully wired (live), **Kick**
+**Build status:** All steps complete. **Twitch** is fully wired (live), **Kick**
 is implemented (library-first with a built-in Pusher fallback), and **X** ships
-as a structured adapter with all undocumented values isolated as TODO constants /
-env overrides (fill them in via [`RECON.md`](./RECON.md)). Step 4 is polish.
+as a scalable adapter — a shared token-minting access provider feeding lightweight
+raw-WS ingesters (handles 20+ chats), with all undocumented values isolated as
+TODO constants / env overrides (fill them in via [`RECON.md`](./RECON.md)). Plus
+emote/pill/perf/reconnect polish.
 
 ---
 
@@ -77,14 +79,27 @@ working values or front it with a proxy via `KICK_API_BASE`.
 
 ### X (Twitter) broadcast notes
 
-X broadcast chat (descended from Periscope) is **not** in the documented X API,
-so its endpoints/tokens are not shipped. The ingester has the correct structure
-(`getAccess → {chatWsUrl, accessToken}` → connect → subscribe → parse) with every
-unknown as a `TODO_X_*` constant. Capture the real values from DevTools per
-[`RECON.md`](./RECON.md) and set them via env (`X_CHAT_WS_URL` + `X_ACCESS_TOKEN`,
-or `X_ACCESS_URL` + `X_AUTH_BEARER`) — no code change needed. Until configured, X
-stays in a harmless "not configured" backoff loop and never affects the other
-two feeds.
+X broadcast chat (descended from Periscope) is **not** in the documented X API —
+[confirmed against the docs](https://docs.x.com/x-api/introduction): the Spaces
+API is metadata-only and the broadcast/Periscope chat API was decommissioned. So
+its endpoints/tokens are not shipped.
+
+The design separates the auth-hard part from the cheap part so it **scales to
+20+ chats**:
+
+- A single shared **access provider** mints/caches/refreshes the short-lived
+  `{chatWsUrl, accessToken}` (see `src/ingesters/x-access.ts`). Pick via `X_MODE`:
+  - `static` — paste captured `X_CHAT_WS_URL` + `X_ACCESS_TOKEN` (one broadcast)
+  - `http` — replicate the access XHR (`X_ACCESS_URL` + auth)
+  - `browser` — optional Puppeteer token-minter: **one** logged-in session mints
+    tokens for **many** broadcasts (the scalable path; needs `npm i puppeteer`)
+  - `auto` — first of the above that's configured
+- Each chat is then a **lightweight raw WebSocket** ingester consuming that
+  token — 20+ chats = 20+ cheap sockets sharing one minter.
+
+All X-specific unknowns remain clearly-named `TODO_X_*` constants; fill them from
+DevTools per [`RECON.md`](./RECON.md). Until configured, X sits in a harmless
+"not configured" backoff loop and never affects the Twitch/Kick feeds.
 
 ## Run
 

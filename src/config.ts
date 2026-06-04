@@ -24,15 +24,36 @@ export interface KickConfig {
   readyTimeoutMs: number;
 }
 
+/**
+ * How the shared X access provider mints { chatWsUrl, accessToken }:
+ *   static  — use captured X_CHAT_WS_URL + X_ACCESS_TOKEN (one broadcast)
+ *   http    — replicate the access XHR yourself (X_ACCESS_URL + auth)
+ *   browser — optional Puppeteer token-minter (one session → many broadcasts);
+ *             the scalable path for 20+ chats
+ *   auto    — pick the first of the above that's configured
+ */
+export type XMode = "auto" | "static" | "http" | "browser";
+
 export interface XConfig {
-  /** XHR template that grants chat access; {broadcastId} is substituted. UNKNOWN — see RECON.md. */
-  accessUrl?: string;
-  /** Bearer token for the access XHR (capture from DevTools). */
-  authBearer?: string;
-  /** Skip getAccess: a chat socket URL captured directly from DevTools. */
+  mode: XMode;
+  /** static: a chat socket URL captured directly from DevTools. */
   chatWsUrl?: string;
-  /** Skip getAccess: an access token captured directly from DevTools. */
+  /** static: an access token captured directly from DevTools. */
   accessToken?: string;
+  /** http: XHR template that grants chat access; {broadcastId} is substituted. UNKNOWN — see RECON.md. */
+  accessUrl?: string;
+  /** http: bearer token for the access XHR. */
+  authBearer?: string;
+  /** http/browser: the `auth_token` cookie value (logged-in session). */
+  authTokenCookie?: string;
+  /** http/browser: the `ct0` CSRF cookie value. */
+  csrfToken?: string;
+  /** browser: run the token-minter headless. */
+  browserHeadless: boolean;
+  /** Override the (TODO) subscribe frame sent after the chat socket opens. */
+  subscribeFrame?: string;
+  /** Treat a minted token as valid for this long, then refresh. */
+  tokenTtlMs: number;
 }
 
 export interface AppConfig {
@@ -107,10 +128,16 @@ export function loadConfig(): AppConfig {
       readyTimeoutMs: int(process.env.KICK_READY_TIMEOUT_MS, 20000),
     },
     x: {
-      accessUrl: str(process.env.X_ACCESS_URL),
-      authBearer: str(process.env.X_AUTH_BEARER),
+      mode: (str(process.env.X_MODE) as XMode) ?? "auto",
       chatWsUrl: str(process.env.X_CHAT_WS_URL),
       accessToken: str(process.env.X_ACCESS_TOKEN),
+      accessUrl: str(process.env.X_ACCESS_URL),
+      authBearer: str(process.env.X_AUTH_BEARER),
+      authTokenCookie: str(process.env.X_AUTH_TOKEN),
+      csrfToken: str(process.env.X_CSRF),
+      browserHeadless: process.env.X_BROWSER_HEADLESS === undefined ? true : bool(process.env.X_BROWSER_HEADLESS),
+      subscribeFrame: str(process.env.X_SUBSCRIBE_FRAME),
+      tokenTtlMs: int(process.env.X_TOKEN_TTL_MS, 240000),
     },
     reconnect: {
       initialMs: int(process.env.RECONNECT_INITIAL_MS, 1000),

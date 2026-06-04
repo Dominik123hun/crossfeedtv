@@ -1,6 +1,6 @@
 import { loadConfig } from "./config";
 import { Hub } from "./hub";
-import { INGESTER_FACTORIES } from "./ingesters";
+import { closeSharedResources, INGESTER_FACTORIES } from "./ingesters";
 import { logger, setLogLevel } from "./logger";
 import { createServer } from "./server";
 
@@ -24,6 +24,11 @@ async function main(): Promise<void> {
     log.info(`received ${signal}, shutting down`);
     try {
       hub.stop();
+    } catch {
+      /* ignore */
+    }
+    try {
+      closeSharedResources();
     } catch {
       /* ignore */
     }

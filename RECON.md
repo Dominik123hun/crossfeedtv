@@ -107,31 +107,45 @@ real endpoint or token.**
    inside a `payload`/`body` field; the normalizer already tries to unwrap one
    level).
 
-### Step E — plug the values in
+### Step E — pick a mode and plug the values in
 
-Fastest path (no code edit): set env vars and let the ingester skip `getAccess`:
+Set `X_MODE` (or leave `auto`, which picks the first configured). The access
+provider is shared across all X chats; each chat is a cheap raw WebSocket, so
+this scales to many broadcasts at once.
 
-| Captured (DevTools)             | Env var          | Used in       |
-| ------------------------------- | ---------------- | ------------- |
-| chat `wss://…` URL              | `X_CHAT_WS_URL`  | `x.ts`        |
-| access token from the XHR body  | `X_ACCESS_TOKEN` | `x.ts`        |
-| broadcast id (from the URL)     | `X_BROADCAST_ID` | `config`      |
+**`static`** — one broadcast, no auth replication. Paste captured values:
 
-Or let the backend fetch access itself:
+| Captured (DevTools)            | Env var          |
+| ------------------------------ | ---------------- |
+| chat `wss://…` URL             | `X_CHAT_WS_URL`  |
+| access token from the XHR body | `X_ACCESS_TOKEN` |
+| broadcast id (from the URL)    | `X_BROADCAST_ID` |
 
-| Captured (DevTools)                       | Env var         | Used in |
-| ----------------------------------------- | --------------- | ------- |
-| access XHR URL (id → `{broadcastId}`)     | `X_ACCESS_URL`  | `x.ts`  |
-| `Authorization: Bearer …` request header  | `X_AUTH_BEARER` | `x.ts`  |
+**`http`** — backend re-fetches access (auto-refreshes the token):
 
-Then fine-tune these constants in [`src/ingesters/x.ts`](./src/ingesters/x.ts)
-and [`src/ingesters/x-normalize.ts`](./src/ingesters/x-normalize.ts) to match the
-exact response/frame shapes you saw:
+| Captured (DevTools)                      | Env var          |
+| ---------------------------------------- | ---------------- |
+| access XHR URL (id → `{broadcastId}`)    | `X_ACCESS_URL`   |
+| `Authorization: Bearer …` header         | `X_AUTH_BEARER`  |
+| `auth_token` cookie / `ct0` cookie       | `X_AUTH_TOKEN` / `X_CSRF` |
 
-| Constant                      | Meaning                                            |
-| ----------------------------- | -------------------------------------------------- |
-| `TODO_X_ACCESS_URL`           | access XHR URL (if not using `X_ACCESS_URL`)       |
-| `TODO_X_ACCESS_WS_FIELD`      | response field holding the socket URL              |
-| `TODO_X_ACCESS_TOKEN_FIELD`   | response field holding the access token            |
-| `TODO_X_SUBSCRIBE_FRAME`      | the client→server subscribe frame shape            |
-| `TODO_X_FIELD.*`              | chat-frame field names (text/author/color/id/ts)   |
+**`browser`** — the scalable path for **20+ chats**. One Puppeteer session
+(logged in via your captured cookies) opens each broadcast and captures the
+access XHR response, so X handles auth + token refresh for you. Needs
+`npm i puppeteer`. Capture from DevTools → Application → Cookies on `x.com`:
+
+| Captured            | Env var         |
+| ------------------- | --------------- |
+| `auth_token` cookie | `X_AUTH_TOKEN`  |
+| `ct0` cookie        | `X_CSRF`        |
+
+Then confirm the placeholders match what you observed:
+
+| Constant (file)                                    | Meaning                                       |
+| -------------------------------------------------- | --------------------------------------------- |
+| `TODO_X_BROADCAST_URL` (`x-access.ts`)             | live broadcast page URL pattern (browser mode)|
+| `TODO_X_ACCESS_RESPONSE_MATCHER` (`x-access.ts`)   | how to recognize the access XHR (browser mode)|
+| `TODO_X_ACCESS_WS_FIELD` (`x-access.ts`)           | response field holding the socket URL         |
+| `TODO_X_ACCESS_TOKEN_FIELD` (`x-access.ts`)        | response field holding the access token       |
+| `TODO_X_SUBSCRIBE_FRAME` (`x.ts`, or `X_SUBSCRIBE_FRAME`) | client→server subscribe frame shape    |
+| `TODO_X_FIELD.*` (`x-normalize.ts`)                | chat-frame field names (text/author/color/id/ts) |
