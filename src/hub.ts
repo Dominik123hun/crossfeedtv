@@ -4,8 +4,32 @@ import { logger, type Logger } from "./logger";
 import type { Ingester, IngesterState } from "./ingesters/base";
 import type { UserChannels } from "./store";
 import { buildTestMessages } from "./test-feed";
-import { PLATFORMS, type NormalizedMessage, type Platform, type ServerFrame } from "./types";
+import {
+  PLATFORMS,
+  type ConnState,
+  type NormalizedMessage,
+  type Platform,
+  type ServerFrame,
+} from "./types";
 import { randomId } from "./util";
+
+/** Map an internal ingester lifecycle state to the public connection state. */
+function wireState(state: IngesterState): ConnState {
+  switch (state) {
+    case "connected":
+      return "connected";
+    case "reconnecting":
+      return "reconnecting";
+    case "error":
+      return "error";
+    case "stopped":
+      return "disconnected";
+    case "connecting":
+    case "idle":
+    default:
+      return "connecting";
+  }
+}
 
 /** Which channels a feed client wants, plus optional owning user (multi-tenant). */
 export interface FeedSubscription {
@@ -171,7 +195,12 @@ export class Hub {
     }
 
     this.send(ws, { type: "hello", subscriptions: [...subs] });
-    for (const key of subs) this.sendStatus(ws, key);
+    // Definitive per-platform status (idle for platforms with no channel set).
+    for (const platform of PLATFORMS) {
+      const key = [...subs].find((k) => k.startsWith(`${platform}:`));
+      if (key) this.sendStatusForKey(ws, key);
+      else this.send(ws, { type: "status", platform, state: "idle" });
+    }
 
     this.log.info(
       `client ${id.slice(0, 8)}${client.userId ? ` (user ${client.userId.slice(0, 8)})` : ""} connected; subs=[${[...subs].join(", ") || "none"}]; clients=${this.clients.size}`,
@@ -268,12 +297,15 @@ export class Hub {
         const [platform, channel] = splitKey(key);
         this.ensure(platform, channel, false);
         client.subs.add(key);
-        this.sendStatus(client.ws, key);
+        this.sendStatusForKey(client.ws, key);
       }
       for (const key of [...client.subs]) {
         if (desired.has(key)) continue;
         client.subs.delete(key);
         this.release(key);
+        const [platform] = splitKey(key);
+        // A platform with no channel anymore reports idle.
+        this.send(client.ws, { type: "status", platform, state: "idle" });
       }
       this.send(client.ws, { type: "hello", subscriptions: [...client.subs] });
     }
@@ -295,11 +327,11 @@ export class Hub {
     }
   }
 
-  private sendStatus(ws: WebSocket, key: string): void {
+  private sendStatusForKey(ws: WebSocket, key: string): void {
     const entry = this.entries.get(key);
     if (!entry) return;
-    const [platform, channel] = splitKey(key);
-    this.send(ws, { type: "status", platform, channel, state: entry.state, info: entry.info });
+    const [platform] = splitKey(key);
+    this.send(ws, { type: "status", platform, state: wireState(entry.state), detail: entry.info });
   }
 
   private removeClient(id: string): void {
@@ -339,7 +371,12 @@ export class Hub {
       entry.state = state;
       entry.info = info;
     }
-    const data = JSON.stringify({ type: "status", platform, channel, state, info } satisfies ServerFrame);
+    const data = JSON.stringify({
+      type: "status",
+      platform,
+      state: wireState(state),
+      detail: info,
+    } satisfies ServerFrame);
     for (const client of this.clients.values()) {
       if (client.subs.has(key)) this.sendRaw(client.ws, data);
     }

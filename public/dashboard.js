@@ -7,6 +7,14 @@
     testSent: "Test messages sent to your feed.",
     testBusy: "Hang on — a test is already running.",
     testFail: "Couldn't send test messages.",
+    states: {
+      connected: "Connected",
+      connecting: "Connecting…",
+      reconnecting: "Reconnecting…",
+      error: "Error",
+      disconnected: "Disconnected",
+      idle: "No channel set",
+    },
   };
 
   var els = {
@@ -76,6 +84,7 @@
     els.x.value = user.channels.x || "";
     els.overlayUrl.value = overlayAbsoluteUrl(user);
     renderPreview(user);
+    ensureStatusWs(user.token);
   }
 
   function renderPreview(user) {
@@ -87,6 +96,53 @@
     // cache-bust so saving channels/settings refreshes the preview
     iframe.src = user.overlayPath + "&status=1&size=15&_=" + Date.now();
     els.preview.appendChild(iframe);
+  }
+
+  // ── Live per-platform connection status (over the existing /feed WS) ──
+  var statusWs = null;
+  var statusToken = null;
+
+  function ensureStatusWs(token) {
+    if (statusToken === token && statusWs && statusWs.readyState <= 1) return;
+    statusToken = token;
+    if (statusWs) {
+      try { statusWs.close(); } catch (e) {}
+      statusWs = null;
+    }
+    openStatusWs(token);
+  }
+
+  function openStatusWs(token) {
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    var ws = new WebSocket(proto + "//" + location.host + "/feed?token=" + encodeURIComponent(token));
+    statusWs = ws;
+    ws.onmessage = function (ev) {
+      var f;
+      try { f = JSON.parse(ev.data); } catch (e) { return; }
+      if (f.type === "status") setStatusRow(f.platform, f.state, f.detail);
+    };
+    ws.onclose = function () {
+      if (statusWs === ws) {
+        statusWs = null;
+        setTimeout(function () { if (statusToken === token) openStatusWs(token); }, 2000);
+      }
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+
+  function setStatusRow(platform, state, detail) {
+    var dot = document.getElementById("dot-" + platform);
+    var st = document.getElementById("state-" + platform);
+    if (!dot || !st) return;
+    dot.className = "dot " + String(state || "").replace(/[^a-z]/gi, "");
+    var label = (COPY.states && COPY.states[state]) || state || "—";
+    st.textContent = state === "error" && detail ? label + ": " + truncate(detail, 48) : label;
+    st.title = detail || "";
+  }
+
+  function truncate(s, n) {
+    s = String(s);
+    return s.length > n ? s.slice(0, n - 1) + "…" : s;
   }
 
   // ── Load current user (gate the page) ──

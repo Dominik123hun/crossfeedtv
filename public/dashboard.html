@@ -32,6 +32,28 @@
           <!-- Left: channels + account -->
           <div>
             <section class="card panel">
+              <div class="panel-title">Connection status</div>
+              <p class="panel-sub">Live state of each source — updates on its own.</p>
+              <div class="status-rows" id="statusRows" aria-live="polite">
+                <div class="status-row" data-platform="twitch">
+                  <span class="pill twitch">Twitch</span>
+                  <span class="dot" id="dot-twitch"></span>
+                  <span class="state" id="state-twitch">…</span>
+                </div>
+                <div class="status-row" data-platform="kick">
+                  <span class="pill kick">Kick</span>
+                  <span class="dot" id="dot-kick"></span>
+                  <span class="state" id="state-kick">…</span>
+                </div>
+                <div class="status-row" data-platform="x">
+                  <span class="pill x">X</span>
+                  <span class="dot" id="dot-x"></span>
+                  <span class="state" id="state-x">…</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="card panel">
               <div class="panel-title">Connect your channels</div>
               <p class="panel-sub">Enter the handles you want merged. Leave a field blank to skip that platform.</p>
               <form class="channels" id="channelsForm">

@@ -179,7 +179,7 @@
     if (frame.type === "chat") {
       enqueue(frame.msg);
     } else if (frame.type === "status") {
-      setStatus(frame.platform, frame.state);
+      setStatus(frame.platform, frame.state, frame.detail);
     }
   }
 
@@ -313,7 +313,7 @@
   }
 
   // ── Status HUD ────────────────────────────────────────────────────────────
-  function setStatus(name, state) {
+  function setStatus(name, state, detail) {
     if (!cfg.showStatus) return;
     let dot = statusDots[name];
     if (!dot) {
@@ -329,7 +329,7 @@
       statusDots[name] = dot;
     }
     dot.className = "dot " + safeClass(state);
-    dot.title = name + ": " + state;
+    dot.title = name + ": " + state + (detail ? " — " + detail : "");
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────

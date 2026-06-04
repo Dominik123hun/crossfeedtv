@@ -163,6 +163,63 @@
   font-size: 14px;
 }
 
+/* Connection status rows */
+.status-rows {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.status-row {
+  display: grid;
+  grid-template-columns: 78px 14px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.status-row .pill {
+  justify-content: center;
+}
+.status-row .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4a525e;
+  justify-self: center;
+}
+.status-row .dot.connected {
+  background: #2ecc40;
+  box-shadow: 0 0 8px rgba(46, 204, 64, 0.6);
+}
+.status-row .dot.connecting,
+.status-row .dot.reconnecting {
+  background: #ffb000;
+  animation: dotpulse 1.3s ease-in-out infinite;
+}
+.status-row .dot.error,
+.status-row .dot.disconnected {
+  background: #ff4136;
+}
+.status-row .dot.idle {
+  background: #4a525e;
+}
+.status-row .state {
+  font-size: 14px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes dotpulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-row .dot {
+    animation: none !important;
+  }
+}
+
 /* Channel form */
 .channels {
   margin-top: 20px;

@@ -44,6 +44,15 @@ export interface NormalizedMessage {
   test?: boolean;
 }
 
+/** Per-user, per-platform connection state shown in the dashboard/overlay. */
+export type ConnState =
+  | "connected"
+  | "connecting"
+  | "reconnecting"
+  | "error"
+  | "disconnected"
+  | "idle";
+
 /** Frames sent from the backend down to connected overlay clients. */
 export type ServerFrame =
   | { type: "hello"; subscriptions: string[] }
@@ -51,7 +60,7 @@ export type ServerFrame =
   | {
       type: "status";
       platform: Platform;
-      channel: string;
-      state: string;
-      info?: string;
+      state: ConnState;
+      /** Short last-error/detail string (mainly for the "error" state). */
+      detail?: string;
     };
