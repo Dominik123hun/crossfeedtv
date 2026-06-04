@@ -2,14 +2,39 @@ import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
 import { WebSocketServer, type WebSocket } from "ws";
+import { createApi } from "./api";
 import type { AppConfig } from "./config";
-import type { Hub } from "./hub";
+import type { FeedSubscription, Hub } from "./hub";
 import { logger } from "./logger";
+import type { Store } from "./store";
 
 /** Interval between liveness pings to connected overlay clients. */
 const HEARTBEAT_MS = 30000;
 
 type Heartbeatable = WebSocket & { isAlive?: boolean };
+
+/** Clean URL → static HTML file. The functional overlay stays separate from the marketing/app pages. */
+const PAGES: Record<string, string> = {
+  "/": "/landing.html",
+  "/overlay": "/overlay.html",
+  "/dashboard": "/dashboard.html",
+  "/login": "/auth.html",
+  "/signup": "/auth.html",
+};
+
+/** Resolve which channels a /feed client should receive: by token (multi-tenant) or raw params (direct/demo). */
+function resolveFeed(url: URL, store: Store): FeedSubscription {
+  const token = (url.searchParams.get("token") ?? "").trim();
+  if (token) {
+    const user = store.getUserByToken(token);
+    return user ? { channels: user.channels, userId: user.id } : { channels: {} };
+  }
+  const pick = (k: string): string | undefined => {
+    const v = url.searchParams.get(k);
+    return v && v.trim() ? v.trim() : undefined;
+  };
+  return { channels: { twitch: pick("twitch"), kick: pick("kick"), x: pick("x") } };
+}
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -33,12 +58,26 @@ export interface AppServer {
  * /feed. The overlay being same-origin means it can open the feed socket with
  * zero extra config.
  */
-export function createServer(hub: Hub, cfg: AppConfig): AppServer {
+export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer {
   const log = logger.child("http");
   const resolvedRoot = path.resolve(cfg.publicDir);
+  const api = createApi({ store, hub, cfg });
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || "/", "http://localhost");
+
+    if (url.pathname.startsWith("/api/")) {
+      void api.handle(req, res, url).catch((err) => {
+        log.warn("api handler rejected", err);
+        try {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end('{"error":"Something went wrong."}');
+        } catch {
+          /* response already sent */
+        }
+      });
+      return;
+    }
 
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "application/json" });
@@ -46,8 +85,7 @@ export function createServer(hub: Hub, cfg: AppConfig): AppServer {
       return;
     }
 
-    let pathname = decodeURIComponent(url.pathname);
-    if (pathname === "/") pathname = "/overlay.html";
+    const pathname = PAGES[url.pathname] ?? decodeURIComponent(url.pathname);
     serveStatic(resolvedRoot, pathname, res);
   });
 
@@ -68,7 +106,8 @@ export function createServer(hub: Hub, cfg: AppConfig): AppServer {
     ws.on("pong", () => {
       (ws as Heartbeatable).isAlive = true;
     });
-    hub.addClient(ws, req);
+    const url = new URL(req.url || "/", "http://localhost");
+    hub.addClient(ws, resolveFeed(url, store));
   });
 
   // Ping every client periodically; terminate any that missed the last pong.
@@ -99,7 +138,7 @@ export function createServer(hub: Hub, cfg: AppConfig): AppServer {
       return new Promise<void>((resolve) => {
         server.listen(cfg.port, cfg.host, () => {
           log.info(`HTTP + WS listening on http://${cfg.host}:${cfg.port}`);
-          log.info(`overlay: http://localhost:${cfg.port}/overlay.html?twitch=<channel>`);
+          log.info(`landing: http://localhost:${cfg.port}/  ·  dashboard: /dashboard  ·  overlay: /overlay?token=…`);
           resolve();
         });
       });

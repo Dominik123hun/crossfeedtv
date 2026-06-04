@@ -3,6 +3,7 @@ import { Hub } from "./hub";
 import { closeSharedResources, INGESTER_FACTORIES } from "./ingesters";
 import { logger, setLogLevel } from "./logger";
 import { createServer } from "./server";
+import { createStore } from "./store";
 
 async function main(): Promise<void> {
   const cfg = loadConfig();
@@ -17,7 +18,8 @@ async function main(): Promise<void> {
   const hub = new Hub(cfg, INGESTER_FACTORIES);
   hub.start();
 
-  const app = createServer(hub, cfg);
+  const store = createStore(cfg.dataDir);
+  const app = createServer(hub, cfg, store);
   await app.listen();
 
   const shutdown = (signal: string): void => {

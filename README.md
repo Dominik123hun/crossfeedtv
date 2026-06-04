@@ -5,6 +5,10 @@ broadcast** chat into one real-time feed and renders it as a transparent overlay
 you drop into OBS as a **Browser Source**. Stop tabbing between windows — read
 everyone talking to you in one stream.
 
+It ships as a hosted, **multi-tenant SaaS**: a marketing landing page at `/`, an
+authenticated dashboard at `/dashboard` where streamers connect their channels and
+get a unique overlay URL, and the functional overlay at `/overlay`.
+
 ```
  ┌──────────┐   ┌──────────┐   ┌──────────┐
  │ Twitch   │   │ Kick     │   │ X        │   3 isolated ingesters
@@ -138,6 +142,47 @@ Health check / diagnostics:
 ```
 http://localhost:8080/healthz
 ```
+
+---
+
+## Accounts & dashboard (multi-tenant SaaS)
+
+Crossfeed runs as one hosted service for many streamers. Each user signs up,
+connects their channels in the dashboard, and gets a **unique overlay URL** that
+streams only their own merged feed.
+
+The flow:
+
+1. Visit `/` (landing) → **Get started** → `/signup`.
+2. Sign up with email + password (`/login` to return later).
+3. In `/dashboard`, enter your Twitch / Kick / X handles and **Save**.
+4. Copy your overlay URL — `https://<host>/overlay?token=•••` — and paste it into
+   an OBS **Browser Source**. The dashboard shows a live preview and OBS steps.
+
+Changing channels in the dashboard updates any already-connected overlay **live**
+(no OBS refresh). Each user's ingesters are isolated — one user's failing source
+never touches another's feed.
+
+**How it's wired (reused the existing vanilla stack — no framework, light deps):**
+
+- **Auth:** email + password hashed with Node's `crypto` **scrypt**; a random
+  session id in an `HttpOnly`, `SameSite=Lax` cookie (`src/auth.ts`). State-changing
+  API calls also require an `X-Requested-With` header (CSRF).
+- **Store:** a small, atomic **JSON file store** at `DATA_DIR` (`src/store.ts`),
+  hidden behind a `Store` interface. _TODO: swap for Postgres/SQLite for
+  multi-instance hosting or durable data on ephemeral hosts._
+- **API:** `POST /api/signup` · `POST /api/login` · `POST /api/logout` ·
+  `GET /api/me` · `PUT /api/channels` · `POST /api/token/rotate` ·
+  `DELETE /api/account` (`src/api.ts`).
+- **Token → feed:** `/feed?token=…` resolves the token to the user's channels and
+  subscribes them via the same `Hub` fan-out (`src/server.ts`, `src/hub.ts`).
+
+> ⚠️ **Before real paying users:** Kick and X currently use **unofficial**
+> connections. Move them to official APIs first. Billing, paid tiers, and usage
+> limits are intentionally **not** built yet (clear TODOs in the dashboard/code).
+
+Marketing copy lives in one place: the `COPY` object at the top of
+[`public/landing.js`](./public/landing.js).
 
 ---
 

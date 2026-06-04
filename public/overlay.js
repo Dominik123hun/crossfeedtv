@@ -46,6 +46,7 @@
   // ── Config from query params ──────────────────────────────────────────────
   const params = new URLSearchParams(location.search);
   const cfg = {
+    token: (params.get("token") || "").trim(),
     twitch: (params.get("twitch") || "").trim(),
     kick: (params.get("kick") || "").trim(),
     x: (params.get("x") || "").trim(),
@@ -336,9 +337,14 @@
     }
     base = base.replace(/\/+$/, "");
     const q = new URLSearchParams();
-    if (cfg.twitch) q.set("twitch", cfg.twitch);
-    if (cfg.kick) q.set("kick", cfg.kick);
-    if (cfg.x) q.set("x", cfg.x);
+    if (cfg.token) {
+      // Multi-tenant: the token resolves to the user's channels server-side.
+      q.set("token", cfg.token);
+    } else {
+      if (cfg.twitch) q.set("twitch", cfg.twitch);
+      if (cfg.kick) q.set("kick", cfg.kick);
+      if (cfg.x) q.set("x", cfg.x);
+    }
     return base + "/feed?" + q.toString();
   }
 
@@ -350,7 +356,7 @@
   }
 
   function maybeShowHint() {
-    if (cfg.twitch || cfg.kick || cfg.x) return;
+    if (cfg.token || cfg.twitch || cfg.kick || cfg.x) return;
     hintEl.innerHTML =
       '<div class="card"><h1>CrossFeed.tv overlay</h1>' +
       "<div>No channels configured. Add them as query params:</div>" +

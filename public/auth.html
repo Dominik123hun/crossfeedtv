@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crossfeed — Sign in</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <a class="auth-back" href="/">← Back</a>
+    <main class="auth-wrap">
+      <div class="card auth-card">
+        <a class="wordmark" href="/">
+          <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          Crossfeed
+        </a>
+        <div class="auth-head">
+          <h1 id="authTitle">Create your account</h1>
+          <p id="authSubtitle">Connect your channels and get your overlay URL in seconds.</p>
+        </div>
+
+        <div class="notice error hidden" id="error" role="alert"></div>
+
+        <form class="auth-form" id="authForm" novalidate>
+          <div class="field">
+            <label for="email">Email</label>
+            <input class="input" type="email" id="email" name="email" autocomplete="email" required placeholder="you@example.com" />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input class="input" type="password" id="password" name="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters" />
+          </div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit" id="submitBtn">Create account</button>
+        </form>
+
+        <p class="auth-foot" id="switcher"></p>
+      </div>
+    </main>
+    <script src="auth.js"></script>
+  </body>
+</html>

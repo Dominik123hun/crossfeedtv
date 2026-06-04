@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crossfeed — Dashboard</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="wordmark" href="/dashboard">
+          <span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          Crossfeed
+        </a>
+        <div class="who">
+          <span class="email" id="whoEmail">…</span>
+          <button class="btn" id="logoutBtn" type="button">Log out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash">
+      <div class="container">
+        <h1 class="page-title">Your dashboard</h1>
+        <p class="lead">Connect your channels, then drop your unique overlay URL into OBS.</p>
+
+        <div class="notice ok hidden" id="notice" role="status"></div>
+
+        <div class="dash-grid">
+          <!-- Left: channels + account -->
+          <div>
+            <section class="card panel">
+              <div class="panel-title">Connect your channels</div>
+              <p class="panel-sub">Enter the handles you want merged. Leave a field blank to skip that platform.</p>
+              <form class="channels" id="channelsForm">
+                <div class="channel-row">
+                  <span class="pill twitch" id="pillTwitch">Twitch</span>
+                  <input class="input" id="twitchInput" placeholder="channel login, e.g. xqc" autocomplete="off" />
+                  <span class="hint">Your Twitch channel name (no # or URL).</span>
+                </div>
+                <div class="channel-row">
+                  <span class="pill kick" id="pillKick">Kick</span>
+                  <input class="input" id="kickInput" placeholder="channel slug, e.g. xqc" autocomplete="off" />
+                  <span class="hint">Your Kick channel slug.</span>
+                </div>
+                <div class="channel-row">
+                  <span class="pill x" id="pillX">X</span>
+                  <input class="input" id="xInput" placeholder="broadcast id" autocomplete="off" />
+                  <span class="hint">The id of your live X broadcast.</span>
+                </div>
+                <div class="channels-actions">
+                  <button class="btn btn-primary" type="submit" id="saveBtn">Save channels</button>
+                  <span class="panel-sub" id="saveState"></span>
+                </div>
+              </form>
+            </section>
+
+            <section class="card panel danger">
+              <div class="panel-title">Account</div>
+              <p class="panel-sub">Signed in as <strong id="acctEmail">…</strong></p>
+              <div class="channels-actions">
+                <button class="btn btn-danger" id="deleteBtn" type="button">Delete account</button>
+              </div>
+            </section>
+
+            <p class="todo-note">
+              TODO: Kick and X currently use unofficial connections. Move them to official
+              APIs before onboarding real paying users. Billing, paid tiers, and usage limits
+              are intentionally not built yet.
+            </p>
+          </div>
+
+          <!-- Right: overlay URL + preview -->
+          <div>
+            <section class="card panel">
+              <div class="panel-title">Your overlay URL</div>
+              <p class="panel-sub">Unique to your account — it streams only your merged feed.</p>
+              <div class="url-row">
+                <input class="input" id="overlayUrl" readonly value="" />
+                <button class="btn btn-primary" id="copyBtn" type="button">Copy</button>
+              </div>
+              <div class="url-meta">
+                <span>Keep this private.</span>
+                <button id="rotateBtn" type="button">Reset link</button>
+              </div>
+              <ol class="obs-steps">
+                <li>In OBS: <strong>Sources → + → Browser</strong>.</li>
+                <li>Paste your URL above into the <code>URL</code> field.</li>
+                <li>Set size to about <code>460 × 900</code>. Background is already transparent.</li>
+              </ol>
+            </section>
+
+            <section class="card panel">
+              <div class="panel-title">Live preview</div>
+              <p class="panel-sub">Exactly what OBS will render.</p>
+              <div class="preview" id="preview">
+                <div class="preview-empty" id="previewEmpty">Add a channel above to see your feed here.</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="toast" id="toast"></div>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

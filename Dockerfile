@@ -28,6 +28,11 @@ RUN npm ci --omit=dev --omit=optional && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY public ./public
 
+# Writable data dir for the user/session store, owned by the runtime user.
+# For durable data, mount a persistent disk here (or point DATA_DIR at a real DB host).
+RUN mkdir -p /app/data && chown -R node:node /app/data
+ENV DATA_DIR=/app/data
+
 # The platform injects PORT; default to 8080 for local `docker run`.
 ENV PORT=8080
 EXPOSE 8080

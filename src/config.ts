@@ -77,6 +77,12 @@ export interface AppConfig {
   x: XConfig;
   reconnect: ReconnectConfig;
   logLevel: LogLevel;
+  /** Directory for the SaaS data store (users/sessions). */
+  dataDir: string;
+  /** Session lifetime in ms. */
+  sessionTtlMs: number;
+  /** Force/disable the Secure cookie flag; if undefined, inferred per-request. */
+  cookieSecure?: boolean;
 }
 
 /**
@@ -164,5 +170,9 @@ export function loadConfig(): AppConfig {
       connectTimeoutMs: int(process.env.RECONNECT_CONNECT_TIMEOUT_MS, 15000),
     },
     logLevel: (str(process.env.LOG_LEVEL) as LogLevel) ?? "info",
+    dataDir: str(process.env.DATA_DIR) ?? path.resolve(__dirname, "..", "data"),
+    sessionTtlMs: int(process.env.SESSION_TTL_MS, 30 * 24 * 60 * 60 * 1000),
+    cookieSecure:
+      process.env.COOKIE_SECURE === undefined ? undefined : bool(process.env.COOKIE_SECURE),
   };
 }

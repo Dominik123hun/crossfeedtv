@@ -1,10 +1,16 @@
-import type { IncomingMessage } from "http";
 import type { WebSocket } from "ws";
 import type { AppConfig } from "./config";
 import { logger, type Logger } from "./logger";
 import type { Ingester, IngesterState } from "./ingesters/base";
+import type { UserChannels } from "./store";
 import { PLATFORMS, type NormalizedMessage, type Platform, type ServerFrame } from "./types";
 import { randomId } from "./util";
+
+/** Which channels a feed client wants, plus optional owning user (multi-tenant). */
+export interface FeedSubscription {
+  channels: UserChannels;
+  userId?: string;
+}
 
 /**
  * Builds an ingester for one channel. Each platform registers a factory in
@@ -35,6 +41,8 @@ interface Client {
   ws: WebSocket;
   /** Subscription keys, e.g. "twitch:xqc". */
   subs: Set<string>;
+  /** Owning user (multi-tenant), if this client connected via a token. */
+  userId?: string;
 }
 
 function keyOf(platform: Platform, channel: string): string {
@@ -46,16 +54,6 @@ function splitKey(key: string): [Platform, string] {
   return [key.slice(0, i) as Platform, key.slice(i + 1)];
 }
 
-/** Extract requested channels from a /feed?twitch=…&kick=…&x=… URL. */
-function parseRequest(url: string | undefined): Partial<Record<Platform, string>> {
-  const u = new URL(url || "/", "http://localhost");
-  const get = (k: string): string | undefined => {
-    const v = u.searchParams.get(k);
-    return v && v.trim() ? v.trim() : undefined;
-  };
-  return { twitch: get("twitch"), kick: get("kick"), x: get("x") };
-}
-
 /**
  * The Hub is the heart of the fan-out: it owns the set of running ingesters
  * (reference-counted by subscribed clients), routes each normalized message to
@@ -65,6 +63,8 @@ function parseRequest(url: string | undefined): Partial<Record<Platform, string>
 export class Hub {
   private readonly entries = new Map<string, Entry>();
   private readonly clients = new Map<string, Client>();
+  /** Index of clients by owning user, for live re-subscription and disconnects. */
+  private readonly clientsByUser = new Map<string, Set<string>>();
   private readonly log = logger.child("hub");
 
   constructor(
@@ -146,33 +146,31 @@ export class Hub {
 
   // --- Client management ---------------------------------------------------
 
-  addClient(ws: WebSocket, req: IncomingMessage): void {
+  addClient(ws: WebSocket, sub: FeedSubscription): void {
     const id = randomId();
-    const requested = parseRequest(req.url);
     const subs = new Set<string>();
 
     for (const platform of PLATFORMS) {
-      const channel = requested[platform];
+      const channel = sub.channels[platform];
       if (!channel) continue;
       const key = keyOf(platform, channel);
       subs.add(key);
       this.ensure(platform, channel, false);
     }
 
-    const client: Client = { id, ws, subs };
+    const client: Client = { id, ws, subs, userId: sub.userId };
     this.clients.set(id, client);
-
-    this.send(ws, { type: "hello", subscriptions: [...subs] });
-    // Replay current state so the overlay can show connection status immediately.
-    for (const key of subs) {
-      const entry = this.entries.get(key);
-      if (!entry) continue;
-      const [platform, channel] = splitKey(key);
-      this.send(ws, { type: "status", platform, channel, state: entry.state, info: entry.info });
+    if (client.userId) {
+      let set = this.clientsByUser.get(client.userId);
+      if (!set) this.clientsByUser.set(client.userId, (set = new Set()));
+      set.add(id);
     }
 
+    this.send(ws, { type: "hello", subscriptions: [...subs] });
+    for (const key of subs) this.sendStatus(ws, key);
+
     this.log.info(
-      `client ${id.slice(0, 8)} connected; subs=[${[...subs].join(", ") || "none"}]; clients=${this.clients.size}`,
+      `client ${id.slice(0, 8)}${client.userId ? ` (user ${client.userId.slice(0, 8)})` : ""} connected; subs=[${[...subs].join(", ") || "none"}]; clients=${this.clients.size}`,
     );
 
     ws.on("close", () => this.removeClient(id));
@@ -185,10 +183,75 @@ export class Hub {
     });
   }
 
+  /**
+   * Apply a user's new channel set to their live overlay connections so changes
+   * in the dashboard take effect without an OBS refresh. Each user's ingesters
+   * stay isolated — adding/removing only affects that user's clients' refs.
+   */
+  resubscribe(userId: string, channels: UserChannels): void {
+    const ids = this.clientsByUser.get(userId);
+    if (!ids || ids.size === 0) return;
+
+    const desired = new Set<string>();
+    for (const platform of PLATFORMS) {
+      const channel = channels[platform];
+      if (channel) desired.add(keyOf(platform, channel));
+    }
+
+    for (const id of ids) {
+      const client = this.clients.get(id);
+      if (!client) continue;
+
+      for (const key of desired) {
+        if (client.subs.has(key)) continue;
+        const [platform, channel] = splitKey(key);
+        this.ensure(platform, channel, false);
+        client.subs.add(key);
+        this.sendStatus(client.ws, key);
+      }
+      for (const key of [...client.subs]) {
+        if (desired.has(key)) continue;
+        client.subs.delete(key);
+        this.release(key);
+      }
+      this.send(client.ws, { type: "hello", subscriptions: [...client.subs] });
+    }
+    this.log.info(`resubscribed user ${userId.slice(0, 8)} -> [${[...desired].join(", ") || "none"}]`);
+  }
+
+  /** Force-disconnect every overlay client belonging to a user (e.g. on delete). */
+  disconnectUser(userId: string): void {
+    const ids = this.clientsByUser.get(userId);
+    if (!ids) return;
+    for (const id of [...ids]) {
+      const client = this.clients.get(id);
+      if (!client) continue;
+      try {
+        client.ws.close();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  private sendStatus(ws: WebSocket, key: string): void {
+    const entry = this.entries.get(key);
+    if (!entry) return;
+    const [platform, channel] = splitKey(key);
+    this.send(ws, { type: "status", platform, channel, state: entry.state, info: entry.info });
+  }
+
   private removeClient(id: string): void {
     const client = this.clients.get(id);
     if (!client) return;
     this.clients.delete(id);
+    if (client.userId) {
+      const set = this.clientsByUser.get(client.userId);
+      if (set) {
+        set.delete(id);
+        if (set.size === 0) this.clientsByUser.delete(client.userId);
+      }
+    }
     for (const key of client.subs) this.release(key);
     this.log.info(`client ${id.slice(0, 8)} disconnected; clients=${this.clients.size}`);
   }
