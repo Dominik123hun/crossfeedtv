@@ -16,6 +16,13 @@
     <!-- The merged chat feed. Newest messages appear at the bottom. -->
     <main id="chat" class="chat" aria-live="polite"></main>
 
+    <!-- Unobtrusive controls: hidden until hovered, so they never show on stream. -->
+    <div id="controls" class="controls">
+      <button id="testBtn" class="ctl-btn" type="button" title="Send test messages to this feed">
+        Send test
+      </button>
+    </div>
+
     <script src="overlay.js"></script>
   </body>
 </html>

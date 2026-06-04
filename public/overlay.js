@@ -231,7 +231,7 @@
   // ── Message rendering (XSS-safe: text via textContent, never innerHTML) ───
   function renderMessage(msg) {
     const row = document.createElement("div");
-    row.className = "msg " + safeClass(msg.platform);
+    row.className = "msg " + safeClass(msg.platform) + (msg.test ? " is-test" : "");
 
     const pill = document.createElement("span");
     pill.className = "pill " + safeClass(msg.platform);
@@ -241,6 +241,13 @@
     label.textContent = PLATFORM_LABELS[msg.platform] || msg.platform;
     pill.appendChild(label);
     row.appendChild(pill);
+
+    if (msg.test) {
+      const tag = document.createElement("span");
+      tag.className = "test-tag";
+      tag.textContent = "TEST";
+      row.appendChild(tag);
+    }
 
     if (cfg.showBadges && Array.isArray(msg.badges)) {
       for (let i = 0; i < msg.badges.length; i++) {
@@ -380,6 +387,19 @@
     const n = parseInt(value, 10);
     if (!isFinite(n)) return fallback;
     return Math.max(min, Math.min(max, n));
+  }
+
+  // Overlay's own "Send test" control — asks the server (which knows our token)
+  // to inject test messages into our feed. Works from a browser tab or OBS Interact.
+  const testBtn = document.getElementById("testBtn");
+  if (testBtn) {
+    testBtn.addEventListener("click", function () {
+      if (ws && ws.readyState === 1) {
+        try {
+          ws.send(JSON.stringify({ type: "test" }));
+        } catch (e) {}
+      }
+    });
   }
 
   // Go.

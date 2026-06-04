@@ -104,6 +104,14 @@ async function route(
       return json(res, 200, { user: publicUser(updated) });
     }
 
+    if (p === "/api/test" && method === "POST") {
+      const user = currentUser(req, store);
+      if (!user) return json(res, 401, { error: "Not authenticated." });
+      const started = hub.triggerTestForUser(user.id);
+      if (!started) return json(res, 429, { error: "A test is already running — give it a moment." });
+      return json(res, 200, { ok: true });
+    }
+
     if (p === "/api/token/rotate" && method === "POST") {
       const user = currentUser(req, store);
       if (!user) return json(res, 401, { error: "Not authenticated." });

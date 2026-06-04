@@ -40,6 +40,8 @@ export interface NormalizedMessage {
   emotes: Emote[];
   /** Unix epoch milliseconds. */
   timestamp: number;
+  /** True for injected test/preview messages — never persisted, never cross-user. */
+  test?: boolean;
 }
 
 /** Frames sent from the backend down to connected overlay clients. */

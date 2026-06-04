@@ -3,6 +3,7 @@ import type { AppConfig } from "./config";
 import { logger, type Logger } from "./logger";
 import type { Ingester, IngesterState } from "./ingesters/base";
 import type { UserChannels } from "./store";
+import { buildTestMessages } from "./test-feed";
 import { PLATFORMS, type NormalizedMessage, type Platform, type ServerFrame } from "./types";
 import { randomId } from "./util";
 
@@ -65,6 +66,9 @@ export class Hub {
   private readonly clients = new Map<string, Client>();
   /** Index of clients by owning user, for live re-subscription and disconnects. */
   private readonly clientsByUser = new Map<string, Set<string>>();
+  /** Debounce key ("u:<userId>" / "c:<clientId>") -> last test-fire timestamp. */
+  private readonly lastTestAt = new Map<string, number>();
+  private readonly testCooldownMs = 2500;
   private readonly log = logger.child("hub");
 
   constructor(
@@ -181,6 +185,63 @@ export class Hub {
         /* ignore */
       }
     });
+    // Inbound control frames from the overlay (e.g. its "Send test" button).
+    ws.on("message", (raw) => {
+      let frame: { type?: string };
+      try {
+        frame = JSON.parse(raw.toString());
+      } catch {
+        return;
+      }
+      if (frame && frame.type === "test") {
+        if (client.userId) this.triggerTestForUser(client.userId);
+        else this.triggerTestForClient(id);
+      }
+    });
+  }
+
+  // --- Test / preview feed -------------------------------------------------
+
+  /** Inject staggered test messages into every client of a user. Debounced. */
+  triggerTestForUser(userId: string): boolean {
+    if (!this.allowTest(`u:${userId}`)) return false;
+    const ids = this.clientsByUser.get(userId);
+    const targets: Client[] = [];
+    if (ids) {
+      for (const cid of ids) {
+        const c = this.clients.get(cid);
+        if (c) targets.push(c);
+      }
+    }
+    this.staggerTest(targets);
+    return true;
+  }
+
+  /** Inject test messages into a single (non-user/demo) client. Debounced. */
+  triggerTestForClient(clientId: string): boolean {
+    if (!this.allowTest(`c:${clientId}`)) return false;
+    const client = this.clients.get(clientId);
+    if (client) this.staggerTest([client]);
+    return true;
+  }
+
+  private allowTest(key: string): boolean {
+    const now = Date.now();
+    if (now - (this.lastTestAt.get(key) ?? 0) < this.testCooldownMs) return false;
+    this.lastTestAt.set(key, now);
+    return true;
+  }
+
+  private staggerTest(targets: Client[]): void {
+    if (targets.length === 0) return;
+    const messages = buildTestMessages();
+    messages.forEach((msg, i) => {
+      const delay = i * (350 + Math.floor(Math.random() * 120));
+      setTimeout(() => {
+        const data = JSON.stringify({ type: "chat", msg } satisfies ServerFrame);
+        for (const c of targets) this.sendRaw(c.ws, data);
+      }, delay);
+    });
   }
 
   /**
@@ -245,6 +306,7 @@ export class Hub {
     const client = this.clients.get(id);
     if (!client) return;
     this.clients.delete(id);
+    this.lastTestAt.delete(`c:${id}`);
     if (client.userId) {
       const set = this.clientsByUser.get(client.userId);
       if (set) {

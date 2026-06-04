@@ -2,6 +2,13 @@
 (function () {
   "use strict";
 
+  // New user-facing strings live here (not inline).
+  var COPY = {
+    testSent: "Test messages sent to your feed.",
+    testBusy: "Hang on — a test is already running.",
+    testFail: "Couldn't send test messages.",
+  };
+
   var els = {
     whoEmail: document.getElementById("whoEmail"),
     acctEmail: document.getElementById("acctEmail"),
@@ -18,6 +25,7 @@
     deleteBtn: document.getElementById("deleteBtn"),
     preview: document.getElementById("preview"),
     previewEmpty: document.getElementById("previewEmpty"),
+    testBtn: document.getElementById("testBtn"),
     toast: document.getElementById("toast"),
   };
 
@@ -71,18 +79,12 @@
   }
 
   function renderPreview(user) {
-    var hasAny = user.channels.twitch || user.channels.kick || user.channels.x;
+    // Always connect the preview (even with no channels) so the test button has
+    // a live client to render into — and so OBS-style status shows immediately.
     els.preview.innerHTML = "";
-    if (!hasAny) {
-      var empty = document.createElement("div");
-      empty.className = "preview-empty";
-      empty.textContent = "Add a channel above to see your feed here.";
-      els.preview.appendChild(empty);
-      return;
-    }
     var iframe = document.createElement("iframe");
     iframe.title = "Live overlay preview";
-    // cache-bust so saving channels refreshes the preview
+    // cache-bust so saving channels/settings refreshes the preview
     iframe.src = user.overlayPath + "&status=1&size=15&_=" + Date.now();
     els.preview.appendChild(iframe);
   }
@@ -120,6 +122,23 @@
       })
       .then(function () {
         els.saveBtn.disabled = false;
+      });
+  });
+
+  // ── Send test messages ──
+  els.testBtn.addEventListener("click", function () {
+    els.testBtn.disabled = true;
+    api("POST", "/api/test")
+      .then(function () {
+        toast(COPY.testSent);
+      })
+      .catch(function (err) {
+        toast(err.status === 429 ? COPY.testBusy : err.message || COPY.testFail);
+      })
+      .then(function () {
+        setTimeout(function () {
+          els.testBtn.disabled = false;
+        }, 2300);
       });
   });
 

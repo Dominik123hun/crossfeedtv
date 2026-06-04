@@ -242,6 +242,48 @@ body {
   margin-top: 10px;
 }
 
+/* ── Test/preview marker on injected messages ── */
+.msg .test-tag {
+  flex: 0 0 auto;
+  font-size: 0.6em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  text-shadow: none;
+}
+
+/* ── Unobtrusive overlay controls (hidden until the corner is hovered) ── */
+.controls {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  z-index: 20;
+}
+.controls .ctl-btn {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  font: 600 12px/1 var(--font-family);
+  color: #fff;
+  background: rgba(10, 10, 12, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.controls:hover .ctl-btn,
+.controls .ctl-btn:focus-visible {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .controls .ctl-btn {
+    transition: none;
+  }
+}
+
 .hidden {
   display: none !important;
 }
