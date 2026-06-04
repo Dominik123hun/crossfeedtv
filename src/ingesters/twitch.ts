@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import type { ReconnectConfig } from "../config";
+import { mergeEmotes, type TwitchEmoteResolver } from "../emotes";
 import type { Logger } from "../logger";
 import type { Platform } from "../types";
 import { BaseIngester, type IngesterEvents } from "./base";
@@ -32,6 +33,7 @@ export class TwitchIngester extends BaseIngester {
     log: Logger,
     events: IngesterEvents,
     wsUrl: string = DEFAULT_WS_URL,
+    private readonly emotes?: TwitchEmoteResolver,
   ) {
     super(channel, reconnectCfg, log, events);
     this.wsUrl = wsUrl;
@@ -92,9 +94,22 @@ export class TwitchIngester extends BaseIngester {
     switch (msg.command) {
       case "PRIVMSG": {
         const normalized = normalizeTwitchMessage(msg, this.channel);
-        if (normalized) this.emit(normalized);
+        if (normalized) {
+          if (this.emotes) {
+            const roomId = msg.tags["room-id"];
+            if (roomId) this.emotes.warm(this.channel, roomId);
+            normalized.emotes = mergeEmotes(
+              normalized.emotes,
+              this.emotes.match(this.channel, normalized.text),
+            );
+          }
+          this.emit(normalized);
+        }
         break;
       }
+      case "ROOMSTATE":
+        this.emotes?.warm(this.channel, msg.tags["room-id"]);
+        break;
       case "RECONNECT":
         // Twitch asks clients to reconnect before maintenance.
         this.log.info("server requested RECONNECT");

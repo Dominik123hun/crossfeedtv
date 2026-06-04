@@ -12,7 +12,6 @@
      font=Arial              font-family override
      badges=0                hide badges
      status=1                show the per-platform connection HUD
-     thirdparty=0            disable 7TV/BTTV/FFZ global emotes (Twitch)
    ───────────────────────────────────────────────────────────────────────── */
 (function () {
   "use strict";
@@ -56,7 +55,6 @@
     max: clampInt(params.get("max"), 200, 20, 1000),
     showBadges: params.get("badges") !== "0",
     showStatus: params.get("status") === "1",
-    thirdParty: params.get("thirdparty") !== "0",
   };
 
   applyTheme(cfg);
@@ -70,56 +68,9 @@
   if (cfg.showStatus) statusEl.classList.remove("hidden");
   maybeShowHint();
 
-  // ── Global emote registry (extensible: 7TV / BTTV / FFZ / …) ──────────────
-  // code -> url. Message-level emotes always take priority over these.
-  const globalEmotes = new Map();
-
-  // Each provider is a {url, parse} pair; add channel-scoped sets here later by
-  // pushing more providers (they only need to populate `globalEmotes`).
-  function loadThirdPartyEmotes() {
-    if (!cfg.thirdParty) return;
-    const providers = [
-      {
-        url: "https://api.betterttv.net/3/cached/emotes/global",
-        parse: (data) => {
-          (data || []).forEach((e) => {
-            if (e && e.code && e.id)
-              globalEmotes.set(e.code, "https://cdn.betterttv.net/emote/" + e.id + "/2x.webp");
-          });
-        },
-      },
-      {
-        url: "https://api.frankerfacez.com/v1/set/global",
-        parse: (data) => {
-          const sets = (data && data.sets) || {};
-          Object.keys(sets).forEach((k) => {
-            (sets[k].emoticons || []).forEach((e) => {
-              const u = e.urls && (e.urls["2"] || e.urls["1"]);
-              if (e.name && u) globalEmotes.set(e.name, u.indexOf("http") === 0 ? u : "https:" + u);
-            });
-          });
-        },
-      },
-      {
-        url: "https://7tv.io/v3/emote-sets/global",
-        parse: (data) => {
-          ((data && data.emotes) || []).forEach((e) => {
-            if (e && e.name && e.id)
-              globalEmotes.set(e.name, "https://cdn.7tv.app/emote/" + e.id + "/2x.webp");
-          });
-        },
-      },
-    ];
-    providers.forEach((p) => {
-      fetch(p.url)
-        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-        .then((d) => p.parse(d))
-        .catch(() => {
-          /* enhancement only — message-level emotes still render */
-        });
-    });
-  }
-  loadThirdPartyEmotes();
+  // Emote resolution (Twitch native + 7TV/BTTV/FFZ + Kick) happens in the
+  // INGESTER, which attaches {code,url} pairs to each message. The overlay is a
+  // dumb image-swapper: it only reads msg.emotes — no network in the render path.
 
   // ── WebSocket connection with auto-reconnect ──────────────────────────────
   const wsUrl = buildWsUrl(cfg);
@@ -295,8 +246,9 @@
     for (let i = 0; i < tokens.length; i++) {
       if (i > 0) container.appendChild(document.createTextNode(" "));
       const tok = tokens[i];
-      const url = map.get(tok) || globalEmotes.get(tok);
-      if (url) {
+      const url = map.get(tok);
+      // Only accept http(s) image URLs (guard against javascript:/data: injection).
+      if (url && /^https?:\/\//i.test(url)) {
         const img = document.createElement("img");
         img.className = "emote";
         img.src = url;

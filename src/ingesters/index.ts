@@ -1,4 +1,5 @@
 import type { AppConfig } from "../config";
+import { TwitchEmoteResolver } from "../emotes";
 import type { IngesterFactory } from "../hub";
 import { logger } from "../logger";
 import type { Platform } from "../types";
@@ -7,6 +8,9 @@ import { TwitchIngester } from "./twitch";
 import { PooledTwitchIngester, TwitchPool } from "./twitch-pool";
 import { createXAccessProvider, XAccessManager } from "./x-access";
 import { XIngester } from "./x";
+
+// Shared Twitch 3rd-party emote resolver (7TV/BTTV/FFZ), cached per channel.
+const twitchEmotes = new TwitchEmoteResolver({ log: logger.child("emotes") });
 
 /**
  * Registry of per-platform ingester factories. Platforms absent from this map
@@ -32,6 +36,7 @@ function getTwitchPool(cfg: AppConfig): TwitchPool {
         joinWindowMs: cfg.twitch.joinWindowMs,
       },
       logger.child("twitch:pool"),
+      twitchEmotes,
     );
   }
   return twitchPool;
@@ -61,7 +66,7 @@ export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
   twitch: (channel, cfg, log, events) =>
     cfg.twitch.multiplex
       ? new PooledTwitchIngester(channel, getTwitchPool(cfg), events)
-      : new TwitchIngester(channel, cfg.reconnect, log, events, cfg.twitch.wsUrl),
+      : new TwitchIngester(channel, cfg.reconnect, log, events, cfg.twitch.wsUrl, twitchEmotes),
   kick: (channel, cfg, log, events) => new KickIngester(channel, cfg, log, events),
   x: (channel, cfg, log, events) => new XIngester(channel, cfg, log, events, getXAccess(cfg)),
 };

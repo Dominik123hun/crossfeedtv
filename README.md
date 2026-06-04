@@ -263,7 +263,6 @@ Notes:
 | `font`   | `font=Arial`            | system stack | Font family                                    |
 | `badges` | `badges=0`              | `1`          | Show/hide badges                               |
 | `status` | `status=1`              | `0`          | Show the per-platform connection HUD           |
-| `thirdparty` | `thirdparty=0`      | `1`          | Load 7TV/BTTV/FFZ **global** emotes (Twitch)    |
 | `server` | `server=ws://host:8080` | same origin  | Point the overlay at a backend on another host |
 
 Example combining several:
@@ -296,10 +295,14 @@ http://localhost:8080/overlay.html?twitch=xqc&size=22&max=150&status=1
 
 ### Polish & resilience
 
-- **Emotes:** Twitch native + Kick inline emotes come from the message itself;
-  the overlay also loads **7TV / BTTV / FFZ global** emote sets into a shared
-  registry (extensible — add channel-scoped providers in one place). Message
-  emotes always win over globals. Toggle with `thirdparty=0`.
+- **Emotes:** resolved in the **ingester**, not the render path — the overlay is
+  a dumb image-swapper that only reads `msg.emotes`. Twitch messages are augmented
+  with **7TV / BTTV / FFZ** (global + per-channel, keyed off the IRC `room-id`);
+  Kick emotes come inline from the message; X stays text. Sets are fetched on
+  channel connect, cached, refreshed periodically, and **fail soft** (a set that
+  won't load just shows the code as text). Precedence on collisions:
+  channel > global, and within a scope `7TV > BTTV > FFZ > Twitch-native`
+  (see `src/emotes.ts`).
 - **Source pills:** colored Twitch/Kick/X pills with inline brand logos.
 - **Performance:** rAF-batched rendering, `contain` per row, a 200-message DOM
   cap, async image decoding, and a queue cap so bursts on a hidden tab can't grow

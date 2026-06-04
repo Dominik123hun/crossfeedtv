@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import type { ReconnectConfig } from "../config";
+import { mergeEmotes, type TwitchEmoteResolver } from "../emotes";
 import type { Logger } from "../logger";
 import type { NormalizedMessage, Platform } from "../types";
 import { BaseIngester, type Ingester, type IngesterState } from "./base";
@@ -52,6 +53,7 @@ class TwitchConnection extends BaseIngester {
     reconnectCfg: ReconnectConfig,
     private readonly poolCfg: PoolConfig,
     log: Logger,
+    private readonly emotes: TwitchEmoteResolver,
   ) {
     super(id, reconnectCfg, log, { onState: (s, info) => this.fanState(s, info) });
   }
@@ -190,7 +192,17 @@ class TwitchConnection extends BaseIngester {
         if (!sub) return;
         try {
           const normalized = normalizeTwitchMessage(msg, channel);
-          if (normalized) sub.onMessage(normalized);
+          if (normalized) {
+            // Lazily warm 3rd-party sets once we know the channel's numeric id,
+            // then augment native emotes with 7TV/BTTV/FFZ (3rd-party wins).
+            const roomId = msg.tags["room-id"];
+            if (roomId) this.emotes.warm(channel, roomId);
+            normalized.emotes = mergeEmotes(
+              normalized.emotes,
+              this.emotes.match(channel, normalized.text),
+            );
+            sub.onMessage(normalized);
+          }
         } catch (e) {
           this.log.warn("normalize/route failed", e);
         }
@@ -201,9 +213,12 @@ class TwitchConnection extends BaseIngester {
         if (msg.nick && msg.nick !== this.nick) return;
         this.confirmJoin(msg.params[0]);
         break;
-      case "ROOMSTATE":
+      case "ROOMSTATE": {
+        const channel = (msg.params[0] ?? "").replace(/^#/, "").toLowerCase();
+        if (channel) this.emotes.warm(channel, msg.tags["room-id"]);
         this.confirmJoin(msg.params[0]);
         break;
+      }
       case "RECONNECT":
         this.log.info("server requested RECONNECT");
         this.onClosed("server RECONNECT");
@@ -241,6 +256,7 @@ export class TwitchPool {
     private readonly reconnectCfg: ReconnectConfig,
     private readonly poolCfg: PoolConfig,
     private readonly log: Logger,
+    private readonly emotes: TwitchEmoteResolver,
   ) {}
 
   subscribe(sub: ChannelSub): () => void {
@@ -269,7 +285,7 @@ export class TwitchPool {
 
   private spawn(): TwitchConnection {
     const id = `conn#${this.seq++}`;
-    const conn = new TwitchConnection(id, this.reconnectCfg, this.poolCfg, this.log.child(id));
+    const conn = new TwitchConnection(id, this.reconnectCfg, this.poolCfg, this.log.child(id), this.emotes);
     this.connections.push(conn);
     conn.start();
     this.log.info(`opened connection ${id} (${this.connections.length} total)`);
