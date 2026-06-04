@@ -66,8 +66,72 @@ Map the captured values to env vars:
 
 ## X (Twitter) broadcasts
 
-> The X broadcast (ex-Periscope) chat protocol is **not** in the documented X
-> API. The ingester in [`src/ingesters/x.ts`](./src/ingesters/x.ts) ships with
-> the correct STRUCTURE and every unknown value as a clearly named `TODO_`
-> constant. Capture the real values here and fill them in (or set the matching
-> env vars). _This section is finalized in build step 3._
+The X broadcast (ex-Periscope) chat protocol is **not** in the documented X API.
+The ingester in [`src/ingesters/x.ts`](./src/ingesters/x.ts) ships with the
+correct **structure** — `getAccess() → { chatWsUrl, accessToken }` then
+`connectChat()` (open socket → subscribe → parse) — and every unknown value as a
+clearly named `TODO_X_*` constant. Your job is to capture the real values and
+either edit those constants or set the matching env vars. **Nothing here is a
+real endpoint or token.**
+
+### Step A — open a live broadcast with DevTools recording
+
+1. In Chrome, open a **currently-live** broadcast on `x.com` (a Space/broadcast
+   with chat). Keep the tab focused so chat loads.
+2. Open DevTools (`F12`) **before/at** load → **Network** → enable **Preserve log**.
+
+### Step B — find the chat WebSocket (→ `chatWsUrl`)
+
+1. **Network** → **WS** filter.
+2. Look for a socket that is clearly chat (not analytics): its **Messages** tab
+   shows a steady stream of chat-shaped frames as people type.
+3. Copy its full `wss://…` URL → this is **`chatWsUrl`** (`X_CHAT_WS_URL`).
+
+### Step C — find the access XHR just before it (→ `accessToken` + URL)
+
+1. In **Network**, sort by time and look at the **XHR/Fetch** requests that fire
+   **immediately before** that WS opens. One of them grants chat access.
+2. Open it → **Response/Preview**. You're looking for a JSON body containing:
+   - a **socket/endpoint URL** field → maps to `chatWsUrl`
+   - an **access token** field → maps to `accessToken`
+3. Note its **Request URL** (→ `X_ACCESS_URL`, with the broadcast id swapped for
+   `{broadcastId}`) and the **Authorization: Bearer …** request header
+   (→ `X_AUTH_BEARER`).
+
+### Step D — read the subscribe + message frames
+
+1. Back on the WS **Messages** tab, find the **first client→server** frame after
+   connect — that's the **subscribe** frame.
+2. Find an incoming **chat** frame and note which fields hold the text, author,
+   color, id, and timestamp (frames may be **double-encoded** — a JSON string
+   inside a `payload`/`body` field; the normalizer already tries to unwrap one
+   level).
+
+### Step E — plug the values in
+
+Fastest path (no code edit): set env vars and let the ingester skip `getAccess`:
+
+| Captured (DevTools)             | Env var          | Used in       |
+| ------------------------------- | ---------------- | ------------- |
+| chat `wss://…` URL              | `X_CHAT_WS_URL`  | `x.ts`        |
+| access token from the XHR body  | `X_ACCESS_TOKEN` | `x.ts`        |
+| broadcast id (from the URL)     | `X_BROADCAST_ID` | `config`      |
+
+Or let the backend fetch access itself:
+
+| Captured (DevTools)                       | Env var         | Used in |
+| ----------------------------------------- | --------------- | ------- |
+| access XHR URL (id → `{broadcastId}`)     | `X_ACCESS_URL`  | `x.ts`  |
+| `Authorization: Bearer …` request header  | `X_AUTH_BEARER` | `x.ts`  |
+
+Then fine-tune these constants in [`src/ingesters/x.ts`](./src/ingesters/x.ts)
+and [`src/ingesters/x-normalize.ts`](./src/ingesters/x-normalize.ts) to match the
+exact response/frame shapes you saw:
+
+| Constant                      | Meaning                                            |
+| ----------------------------- | -------------------------------------------------- |
+| `TODO_X_ACCESS_URL`           | access XHR URL (if not using `X_ACCESS_URL`)       |
+| `TODO_X_ACCESS_WS_FIELD`      | response field holding the socket URL              |
+| `TODO_X_ACCESS_TOKEN_FIELD`   | response field holding the access token            |
+| `TODO_X_SUBSCRIBE_FRAME`      | the client→server subscribe frame shape            |
+| `TODO_X_FIELD.*`              | chat-frame field names (text/author/color/id/ts)   |

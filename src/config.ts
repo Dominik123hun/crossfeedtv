@@ -22,6 +22,17 @@ export interface KickConfig {
   readyTimeoutMs: number;
 }
 
+export interface XConfig {
+  /** XHR template that grants chat access; {broadcastId} is substituted. UNKNOWN — see RECON.md. */
+  accessUrl?: string;
+  /** Bearer token for the access XHR (capture from DevTools). */
+  authBearer?: string;
+  /** Skip getAccess: a chat socket URL captured directly from DevTools. */
+  chatWsUrl?: string;
+  /** Skip getAccess: an access token captured directly from DevTools. */
+  accessToken?: string;
+}
+
 export interface AppConfig {
   host: string;
   port: number;
@@ -29,6 +40,7 @@ export interface AppConfig {
   defaults: { twitch?: string; kick?: string; x?: string };
   twitchWsUrl: string;
   kick: KickConfig;
+  x: XConfig;
   reconnect: ReconnectConfig;
   logLevel: LogLevel;
 }
@@ -91,6 +103,12 @@ export function loadConfig(): AppConfig {
       pusherCluster: str(process.env.KICK_PUSHER_CLUSTER) ?? DEFAULT_KICK_PUSHER_CLUSTER,
       pusherVersion: str(process.env.KICK_PUSHER_VERSION) ?? "8.4.0",
       readyTimeoutMs: int(process.env.KICK_READY_TIMEOUT_MS, 20000),
+    },
+    x: {
+      accessUrl: str(process.env.X_ACCESS_URL),
+      authBearer: str(process.env.X_AUTH_BEARER),
+      chatWsUrl: str(process.env.X_CHAT_WS_URL),
+      accessToken: str(process.env.X_ACCESS_TOKEN),
     },
     reconnect: {
       initialMs: int(process.env.RECONNECT_INITIAL_MS, 1000),

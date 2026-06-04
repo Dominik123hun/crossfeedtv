@@ -21,9 +21,10 @@ everyone talking to you in one stream.
             └──────────────┘
 ```
 
-**Build status:** Steps 1–2 complete — **Twitch** is fully wired (live), and
-**Kick** is implemented (library-first with a built-in Pusher fallback). X
-(step 3) lands next; the architecture already routes it.
+**Build status:** Steps 1–3 complete — **Twitch** is fully wired (live), **Kick**
+is implemented (library-first with a built-in Pusher fallback), and **X** ships
+as a structured adapter with all undocumented values isolated as TODO constants /
+env overrides (fill them in via [`RECON.md`](./RECON.md)). Step 4 is polish.
 
 ---
 
@@ -73,6 +74,17 @@ The Pusher fallback needs Kick's chatroom id (looked up at runtime) and the
 Pusher app key/cluster (defaults ship in `.env.example`). Cloudflare blocks the
 lookup from many datacenter IPs (`403`) — see [`RECON.md`](./RECON.md) to capture
 working values or front it with a proxy via `KICK_API_BASE`.
+
+### X (Twitter) broadcast notes
+
+X broadcast chat (descended from Periscope) is **not** in the documented X API,
+so its endpoints/tokens are not shipped. The ingester has the correct structure
+(`getAccess → {chatWsUrl, accessToken}` → connect → subscribe → parse) with every
+unknown as a `TODO_X_*` constant. Capture the real values from DevTools per
+[`RECON.md`](./RECON.md) and set them via env (`X_CHAT_WS_URL` + `X_ACCESS_TOKEN`,
+or `X_ACCESS_URL` + `X_AUTH_BEARER`) — no code change needed. Until configured, X
+stays in a harmless "not configured" backoff loop and never affects the other
+two feeds.
 
 ## Run
 
