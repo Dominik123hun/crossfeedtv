@@ -115,6 +115,41 @@
             </section>
 
             <section class="card panel">
+              <div class="panel-title">Overlay settings</div>
+              <p class="panel-sub">Changes apply to your live overlay instantly — no OBS refresh.</p>
+              <div class="settings" id="settings">
+                <div class="set-row">
+                  <label for="setFont">Font size</label>
+                  <input type="range" id="setFont" min="12" max="40" step="1" />
+                  <span class="set-val" id="setFontVal">18px</span>
+                </div>
+                <div class="set-row">
+                  <label for="setOpacity">Background panel</label>
+                  <input type="range" id="setOpacity" min="0" max="90" step="5" />
+                  <span class="set-val" id="setOpacityVal">Off</span>
+                </div>
+                <div class="set-row">
+                  <label for="setPosition">Position</label>
+                  <select class="input" id="setPosition">
+                    <option value="bottom-left">Bottom left</option>
+                    <option value="bottom-right">Bottom right</option>
+                    <option value="top-left">Top left</option>
+                    <option value="top-right">Top right</option>
+                  </select>
+                </div>
+                <fieldset class="set-toggles">
+                  <legend>Show platforms</legend>
+                  <label><input type="checkbox" id="showTwitch" /> <span class="pill twitch">Twitch</span></label>
+                  <label><input type="checkbox" id="showKick" /> <span class="pill kick">Kick</span></label>
+                  <label><input type="checkbox" id="showX" /> <span class="pill x">X</span></label>
+                </fieldset>
+                <label class="set-check">
+                  <input type="checkbox" id="setStatus" /> Show connection dots on the overlay
+                </label>
+              </div>
+            </section>
+
+            <section class="card panel">
               <div class="panel-title">Live preview</div>
               <p class="panel-sub">Exactly what OBS will render.</p>
               <div class="channels-actions">

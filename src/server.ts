@@ -27,7 +27,9 @@ function resolveFeed(url: URL, store: Store): FeedSubscription {
   const token = (url.searchParams.get("token") ?? "").trim();
   if (token) {
     const user = store.getUserByToken(token);
-    return user ? { channels: user.channels, userId: user.id } : { channels: {} };
+    return user
+      ? { channels: user.channels, userId: user.id, settings: user.settings }
+      : { channels: {} };
   }
   const pick = (k: string): string | undefined => {
     const v = url.searchParams.get(k);

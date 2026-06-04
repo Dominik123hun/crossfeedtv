@@ -8,6 +8,7 @@ import {
   PLATFORMS,
   type ConnState,
   type NormalizedMessage,
+  type OverlaySettings,
   type Platform,
   type ServerFrame,
 } from "./types";
@@ -35,6 +36,8 @@ function wireState(state: IngesterState): ConnState {
 export interface FeedSubscription {
   channels: UserChannels;
   userId?: string;
+  /** Overlay settings to push on connect (token-resolved clients). */
+  settings?: OverlaySettings;
 }
 
 /**
@@ -195,6 +198,7 @@ export class Hub {
     }
 
     this.send(ws, { type: "hello", subscriptions: [...subs] });
+    if (sub.settings) this.send(ws, { type: "settings", settings: sub.settings });
     // Definitive per-platform status (idle for platforms with no channel set).
     for (const platform of PLATFORMS) {
       const key = [...subs].find((k) => k.startsWith(`${platform}:`));
@@ -310,6 +314,17 @@ export class Hub {
       this.send(client.ws, { type: "hello", subscriptions: [...client.subs] });
     }
     this.log.info(`resubscribed user ${userId.slice(0, 8)} -> [${[...desired].join(", ") || "none"}]`);
+  }
+
+  /** Push updated overlay settings to all of a user's live clients (no OBS refresh). */
+  pushSettings(userId: string, settings: OverlaySettings): void {
+    const ids = this.clientsByUser.get(userId);
+    if (!ids) return;
+    const data = JSON.stringify({ type: "settings", settings } satisfies ServerFrame);
+    for (const id of ids) {
+      const client = this.clients.get(id);
+      if (client) this.sendRaw(client.ws, data);
+    }
   }
 
   /** Force-disconnect every overlay client belonging to a user (e.g. on delete). */

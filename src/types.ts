@@ -44,6 +44,28 @@ export interface NormalizedMessage {
   test?: boolean;
 }
 
+/** Per-user overlay appearance settings (travel with the token to the overlay). */
+export interface OverlaySettings {
+  /** Base font size in px. */
+  fontSize: number;
+  /** Translucent panel behind each message, 0 (transparent) … 1. */
+  bgOpacity: number;
+  position: "bottom-left" | "bottom-right" | "top-left" | "top-right";
+  /** Per-platform show/hide. */
+  show: { twitch: boolean; kick: boolean; x: boolean };
+  /** Show the small on-overlay connection dots. */
+  statusIndicator: boolean;
+}
+
+/** Defaults chosen so existing overlays look unchanged until a user customizes. */
+export const DEFAULT_OVERLAY_SETTINGS: OverlaySettings = {
+  fontSize: 18,
+  bgOpacity: 0,
+  position: "bottom-left",
+  show: { twitch: true, kick: true, x: true },
+  statusIndicator: false,
+};
+
 /** Per-user, per-platform connection state shown in the dashboard/overlay. */
 export type ConnState =
   | "connected"
@@ -63,4 +85,5 @@ export type ServerFrame =
       state: ConnState;
       /** Short last-error/detail string (mainly for the "error" state). */
       detail?: string;
-    };
+    }
+  | { type: "settings"; settings: OverlaySettings };

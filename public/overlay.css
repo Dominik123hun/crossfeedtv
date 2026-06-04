@@ -242,6 +242,29 @@ body {
   margin-top: 10px;
 }
 
+/* ── Customization: position / panel / per-platform hide (driven by settings) ── */
+.chat.pos-top {
+  /* Newest at top, older clipped at the bottom. */
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+}
+.chat.align-right {
+  align-items: flex-end;
+}
+.chat.align-right .msg {
+  text-align: right;
+}
+body.has-panel .msg {
+  background: var(--msg-bg, rgba(8, 8, 12, 0.5));
+  padding: 0.18em 0.55em;
+  border-radius: 9px;
+}
+body.hide-twitch .msg.twitch,
+body.hide-kick .msg.kick,
+body.hide-x .msg.x {
+  display: none;
+}
+
 /* ── Test/preview marker on injected messages ── */
 .msg .test-tag {
   flex: 0 0 auto;

@@ -180,6 +180,8 @@
       enqueue(frame.msg);
     } else if (frame.type === "status") {
       setStatus(frame.platform, frame.state, frame.detail);
+    } else if (frame.type === "settings") {
+      applyOverlaySettings(frame.settings);
     }
   }
 
@@ -360,6 +362,39 @@
     const size = clampInt(cfg.size, 0, 8, 96);
     if (size) root.style.setProperty("--font-size", size + "px");
     if (cfg.font) root.style.setProperty("--font-family", cfg.font);
+  }
+
+  // Apply per-user overlay settings pushed by the server (token-resolved). These
+  // travel with the feed, so OBS needs no refresh when they change.
+  function applyOverlaySettings(s) {
+    if (!s || typeof s !== "object") return;
+    const root = document.documentElement;
+
+    if (typeof s.fontSize === "number") {
+      root.style.setProperty("--font-size", clampInt(s.fontSize, 18, 8, 96) + "px");
+    }
+
+    const op = typeof s.bgOpacity === "number" ? Math.max(0, Math.min(1, s.bgOpacity)) : 0;
+    if (op > 0) {
+      root.style.setProperty("--msg-bg", "rgba(8, 8, 12, " + op + ")");
+      document.body.classList.add("has-panel");
+    } else {
+      document.body.classList.remove("has-panel");
+    }
+
+    const pos = typeof s.position === "string" ? s.position : "bottom-left";
+    const vert = pos.indexOf("top") === 0 ? "pos-top" : "pos-bottom";
+    const horiz = pos.indexOf("right") >= 0 ? " align-right" : "";
+    chatEl.className = "chat " + vert + horiz;
+
+    const show = s.show || {};
+    ["twitch", "kick", "x"].forEach(function (p) {
+      document.body.classList.toggle("hide-" + p, show[p] === false);
+    });
+
+    cfg.showStatus = !!s.statusIndicator;
+    if (cfg.showStatus) statusEl.classList.remove("hidden");
+    else statusEl.classList.add("hidden");
   }
 
   function maybeShowHint() {

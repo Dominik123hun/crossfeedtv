@@ -35,6 +35,16 @@
     previewEmpty: document.getElementById("previewEmpty"),
     testBtn: document.getElementById("testBtn"),
     toast: document.getElementById("toast"),
+    // settings controls
+    setFont: document.getElementById("setFont"),
+    setFontVal: document.getElementById("setFontVal"),
+    setOpacity: document.getElementById("setOpacity"),
+    setOpacityVal: document.getElementById("setOpacityVal"),
+    setPosition: document.getElementById("setPosition"),
+    showTwitch: document.getElementById("showTwitch"),
+    showKick: document.getElementById("showKick"),
+    showX: document.getElementById("showX"),
+    setStatus: document.getElementById("setStatus"),
   };
 
   var current = null; // last known user object
@@ -83,9 +93,68 @@
     els.kick.value = user.channels.kick || "";
     els.x.value = user.channels.x || "";
     els.overlayUrl.value = overlayAbsoluteUrl(user);
+    applySettingsToControls(user.settings);
     renderPreview(user);
     ensureStatusWs(user.token);
   }
+
+  // ── Overlay settings ──
+  function applySettingsToControls(s) {
+    s = s || {};
+    var font = typeof s.fontSize === "number" ? s.fontSize : 18;
+    els.setFont.value = font;
+    els.setFontVal.textContent = font + "px";
+    var opPct = Math.round((typeof s.bgOpacity === "number" ? s.bgOpacity : 0) * 100);
+    els.setOpacity.value = opPct;
+    els.setOpacityVal.textContent = opPct === 0 ? "Off" : opPct + "%";
+    els.setPosition.value = s.position || "bottom-left";
+    var show = s.show || { twitch: true, kick: true, x: true };
+    els.showTwitch.checked = show.twitch !== false;
+    els.showKick.checked = show.kick !== false;
+    els.showX.checked = show.x !== false;
+    els.setStatus.checked = !!s.statusIndicator;
+  }
+
+  function readSettingsFromControls() {
+    return {
+      fontSize: parseInt(els.setFont.value, 10),
+      bgOpacity: parseInt(els.setOpacity.value, 10) / 100,
+      position: els.setPosition.value,
+      show: {
+        twitch: els.showTwitch.checked,
+        kick: els.showKick.checked,
+        x: els.showX.checked,
+      },
+      statusIndicator: els.setStatus.checked,
+    };
+  }
+
+  var settingsTimer = null;
+  function scheduleSaveSettings() {
+    // live label feedback
+    els.setFontVal.textContent = els.setFont.value + "px";
+    var op = parseInt(els.setOpacity.value, 10);
+    els.setOpacityVal.textContent = op === 0 ? "Off" : op + "%";
+    clearTimeout(settingsTimer);
+    settingsTimer = setTimeout(function () {
+      // The server pushes the new settings to the live overlay/preview, so we do
+      // NOT re-render here (that would reload the preview). Reuses the live push.
+      api("PUT", "/api/settings", readSettingsFromControls())
+        .then(function (data) {
+          current = data.user;
+        })
+        .catch(function (err) {
+          toast(err.message || "Couldn't save settings.");
+        });
+    }, 250);
+  }
+
+  ["setFont", "setOpacity"].forEach(function (k) {
+    els[k].addEventListener("input", scheduleSaveSettings);
+  });
+  ["setPosition", "showTwitch", "showKick", "showX", "setStatus"].forEach(function (k) {
+    els[k].addEventListener("change", scheduleSaveSettings);
+  });
 
   function renderPreview(user) {
     // Always connect the preview (even with no channels) so the test button has

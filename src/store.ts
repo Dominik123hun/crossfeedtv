@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { DEFAULT_OVERLAY_SETTINGS, type OverlaySettings } from "./types";
 import { randomId } from "./util";
 
 /**
@@ -30,6 +31,8 @@ export interface User {
   channels: UserChannels;
   /** Bearer token embedded in the user's unique overlay URL. */
   token: string;
+  /** Overlay appearance settings. */
+  settings: OverlaySettings;
 }
 
 export interface Session {
@@ -45,6 +48,7 @@ export interface Store {
   getUserById(id: string): User | undefined;
   getUserByToken(token: string): User | undefined;
   updateChannels(id: string, channels: UserChannels): User | undefined;
+  updateSettings(id: string, settings: OverlaySettings): User | undefined;
   rotateToken(id: string): User | undefined;
   deleteUser(id: string): void;
   createSession(userId: string, ttlMs: number): Session;
@@ -97,6 +101,7 @@ export function createStore(dataDir: string): Store {
         createdAt: Date.now(),
         channels: {},
         token,
+        settings: { ...DEFAULT_OVERLAY_SETTINGS },
       };
       db.users[id] = user;
       byEmail.set(email, id);
@@ -123,6 +128,14 @@ export function createStore(dataDir: string): Store {
       const user = db.users[id];
       if (!user) return undefined;
       user.channels = { twitch: channels.twitch, kick: channels.kick, x: channels.x };
+      persist();
+      return user;
+    },
+
+    updateSettings(id, settings) {
+      const user = db.users[id];
+      if (!user) return undefined;
+      user.settings = settings;
       persist();
       return user;
     },
@@ -180,7 +193,12 @@ export function createStore(dataDir: string): Store {
 function load(file: string): DBShape {
   try {
     const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Partial<DBShape>;
-    return { users: parsed.users ?? {}, sessions: parsed.sessions ?? {} };
+    const users = parsed.users ?? {};
+    // Migrate any user records that predate overlay settings.
+    for (const user of Object.values(users)) {
+      if (!user.settings) user.settings = { ...DEFAULT_OVERLAY_SETTINGS };
+    }
+    return { users, sessions: parsed.sessions ?? {} };
   } catch {
     return { users: {}, sessions: {} };
   }

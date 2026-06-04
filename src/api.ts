@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "http";
 import type { AppConfig } from "./config";
 import type { Hub } from "./hub";
 import type { Store, User, UserChannels } from "./store";
+import { DEFAULT_OVERLAY_SETTINGS, type OverlaySettings } from "./types";
 import {
   clearSessionCookie,
   currentUser,
@@ -104,6 +105,16 @@ async function route(
       return json(res, 200, { user: publicUser(updated) });
     }
 
+    if (p === "/api/settings" && method === "PUT") {
+      const user = currentUser(req, store);
+      if (!user) return json(res, 401, { error: "Not authenticated." });
+      const body = await readJson(req);
+      const settings = sanitizeSettings(body, user.settings ?? DEFAULT_OVERLAY_SETTINGS);
+      const updated = store.updateSettings(user.id, settings) ?? user;
+      hub.pushSettings(user.id, settings);
+      return json(res, 200, { user: publicUser(updated) });
+    }
+
     if (p === "/api/test" && method === "POST") {
       const user = currentUser(req, store);
       if (!user) return json(res, 401, { error: "Not authenticated." });
@@ -159,12 +170,37 @@ function publicUser(user: User): {
   channels: UserChannels;
   token: string;
   overlayPath: string;
+  settings: OverlaySettings;
 } {
   return {
     email: user.email,
     channels: user.channels,
     token: user.token,
     overlayPath: `/overlay?token=${user.token}`,
+    settings: user.settings ?? DEFAULT_OVERLAY_SETTINGS,
+  };
+}
+
+/** Validate/clamp overlay settings, falling back to the user's current values. */
+function sanitizeSettings(body: Record<string, unknown>, current: OverlaySettings): OverlaySettings {
+  const num = (v: unknown, lo: number, hi: number, dflt: number): number => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
+  };
+  const positions = ["bottom-left", "bottom-right", "top-left", "top-right"] as const;
+  const pos = positions.includes(body.position as never)
+    ? (body.position as OverlaySettings["position"])
+    : current.position;
+  const show = (body.show ?? {}) as Record<string, unknown>;
+  const showBool = (key: keyof OverlaySettings["show"]): boolean =>
+    typeof show[key] === "boolean" ? (show[key] as boolean) : current.show[key];
+  return {
+    fontSize: Math.round(num(body.fontSize, 8, 96, current.fontSize)),
+    bgOpacity: num(body.bgOpacity, 0, 1, current.bgOpacity),
+    position: pos,
+    show: { twitch: showBool("twitch"), kick: showBool("kick"), x: showBool("x") },
+    statusIndicator:
+      typeof body.statusIndicator === "boolean" ? body.statusIndicator : current.statusIndicator,
   };
 }
 

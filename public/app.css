@@ -249,6 +249,64 @@
   align-items: center;
 }
 
+/* Overlay settings */
+.settings {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.set-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 56px;
+  align-items: center;
+  gap: 12px;
+}
+.set-row > label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.set-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.set-val {
+  font-size: 13px;
+  color: var(--text-faint);
+  text-align: right;
+  font-family: var(--mono);
+}
+.set-toggles {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.set-toggles legend {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-dim);
+  padding: 0 6px;
+}
+.set-toggles label,
+.set-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.set-toggles input,
+.set-check input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
 /* Overlay URL */
 .url-row {
   margin-top: 16px;
