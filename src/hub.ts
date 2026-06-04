@@ -2,7 +2,7 @@ import type { IncomingMessage } from "http";
 import type { WebSocket } from "ws";
 import type { AppConfig } from "./config";
 import { logger, type Logger } from "./logger";
-import type { BaseIngester, IngesterState } from "./ingesters/base";
+import type { Ingester, IngesterState } from "./ingesters/base";
 import { PLATFORMS, type NormalizedMessage, type Platform, type ServerFrame } from "./types";
 import { randomId } from "./util";
 
@@ -18,10 +18,10 @@ export type IngesterFactory = (
     onMessage: (msg: NormalizedMessage) => void;
     onState: (state: IngesterState, info?: string) => void;
   },
-) => BaseIngester;
+) => Ingester;
 
 interface Entry {
-  ingester: BaseIngester;
+  ingester: Ingester;
   /** Number of connected clients subscribed (env-default ingesters add 0). */
   refs: number;
   /** Persistent ingesters (from env defaults) are never torn down. */
@@ -111,7 +111,7 @@ export class Hub {
     // Isolation: a failure constructing/starting one ingester must not affect others.
     try {
       const entry: Entry = {
-        ingester: undefined as unknown as BaseIngester,
+        ingester: undefined as unknown as Ingester,
         refs: persistent ? 0 : 1,
         persistent,
         state: "idle",

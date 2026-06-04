@@ -56,12 +56,23 @@ export interface XConfig {
   tokenTtlMs: number;
 }
 
+export interface TwitchConfig {
+  wsUrl: string;
+  /** Multiplex many channels onto a few shared IRC connections (scales to many channels). */
+  multiplex: boolean;
+  /** Max channels JOINed per shared connection before opening another. */
+  maxChannelsPerConn: number;
+  /** JOIN rate limit per shared connection (Twitch allows ~20 / 10s). */
+  joinsPerWindow: number;
+  joinWindowMs: number;
+}
+
 export interface AppConfig {
   host: string;
   port: number;
   publicDir: string;
   defaults: { twitch?: string; kick?: string; x?: string };
-  twitchWsUrl: string;
+  twitch: TwitchConfig;
   kick: KickConfig;
   x: XConfig;
   reconnect: ReconnectConfig;
@@ -118,7 +129,13 @@ export function loadConfig(): AppConfig {
       kick: str(process.env.KICK_CHANNEL),
       x: str(process.env.X_BROADCAST_ID),
     },
-    twitchWsUrl: str(process.env.TWITCH_WS_URL) ?? "wss://irc-ws.chat.twitch.tv:443",
+    twitch: {
+      wsUrl: str(process.env.TWITCH_WS_URL) ?? "wss://irc-ws.chat.twitch.tv:443",
+      multiplex: process.env.TWITCH_MULTIPLEX === undefined ? true : bool(process.env.TWITCH_MULTIPLEX),
+      maxChannelsPerConn: int(process.env.TWITCH_MAX_CHANNELS_PER_CONN, 50),
+      joinsPerWindow: int(process.env.TWITCH_JOINS_PER_WINDOW, 18),
+      joinWindowMs: int(process.env.TWITCH_JOIN_WINDOW_MS, 10000),
+    },
     kick: {
       forcePusher: bool(process.env.KICK_FORCE_PUSHER),
       apiBase: str(process.env.KICK_API_BASE) ?? "https://kick.com",

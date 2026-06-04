@@ -16,6 +16,18 @@ export interface IngesterEvents {
 }
 
 /**
+ * The minimal contract the Hub depends on. Most ingesters are BaseIngester
+ * subclasses, but a multiplexed one (e.g. PooledTwitchIngester) can implement
+ * this directly without owning a socket of its own.
+ */
+export interface Ingester {
+  readonly platform: Platform;
+  readonly channel: string;
+  start(): void;
+  stop(): void;
+}
+
+/**
  * Shared lifecycle for every platform ingester:
  *
  *   connect -> handshake -> parse -> normalize -> emit -> auto-reconnect (backoff)
@@ -29,7 +41,7 @@ export interface IngesterEvents {
  * and connect exceptions are funneled into the reconnect path. A single
  * ingester can never throw out into the Hub and take down the other sources.
  */
-export abstract class BaseIngester {
+export abstract class BaseIngester implements Ingester {
   abstract readonly platform: Platform;
   readonly channel: string;
 

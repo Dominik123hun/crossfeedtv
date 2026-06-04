@@ -43,9 +43,9 @@ export class TwitchIngester extends BaseIngester {
 
     ws.on("open", () => {
       // Handshake: request metadata capabilities, log in anonymously, join.
-      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership");
-      ws.send(`NICK ${anonNick()}`);
-      ws.send(`JOIN #${this.channel.toLowerCase()}`);
+      ws.send("CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership\r\n");
+      ws.send(`NICK ${anonNick()}\r\n`);
+      ws.send(`JOIN #${this.channel.toLowerCase()}\r\n`);
       this.onConnected();
     });
 
@@ -113,7 +113,7 @@ export class TwitchIngester extends BaseIngester {
     const ws = this.ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
       try {
-        ws.send(raw);
+        ws.send(raw.endsWith("\r\n") ? raw : raw + "\r\n");
       } catch (err) {
         this.log.warn("send failed", err);
       }

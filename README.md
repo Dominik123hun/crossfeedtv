@@ -199,9 +199,10 @@ Notes:
   plan for always-on.
 - The backend is **open** by default (it'll join any channel in a URL). Fine for
   personal/contest use; add an allowlist before exposing it widely.
-- At large scale (many distinct channels on one host) you'll hit **platform** rate
-  limits before the server strains — see the scaling notes in the chat history /
-  open an issue for Twitch connection-multiplexing.
+- Twitch channels are **multiplexed** onto shared connections by default, so one
+  host can serve many distinct channels. At very large scale you may still hit
+  **platform** rate limits (especially Kick lookups and X auth from one IP)
+  before the server itself strains.
 
 ---
 
@@ -234,9 +235,12 @@ http://localhost:8080/overlay.html?twitch=xqc&size=22&max=150&status=1
   `connect → handshake → parse → normalize → emit → auto-reconnect (backoff)`.
   Subclasses implement only the transport. Every callback is wrapped so one
   ingester can never throw out and take down the others.
-- **`src/ingesters/twitch.ts`** — anonymous Twitch IRC-over-WebSocket reader
-  (`justinfan` login, `CAP REQ` tags/commands/membership, `JOIN`, parse
-  `PRIVMSG` tags for color/badges/emotes).
+- **`src/ingesters/twitch.ts` / `twitch-pool.ts`** — anonymous Twitch
+  IRC-over-WebSocket reader (`justinfan` login, `CAP REQ` tags/commands/membership,
+  `JOIN`, parse `PRIVMSG` tags for color/badges/emotes). By default channels are
+  **multiplexed** onto a few shared connections (rate-limited JOINs, per-channel
+  routing) so one host can serve many distinct channels without hitting Twitch's
+  connection limits. Set `TWITCH_MULTIPLEX=false` for one connection per channel.
 - **`src/hub.ts`** — owns the running ingesters (reference-counted by connected
   clients), and routes each normalized message to exactly the clients that asked
   for that platform+channel. One backend serves many overlays.
