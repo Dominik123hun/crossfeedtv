@@ -7,6 +7,8 @@ export interface ReconnectConfig {
   factor: number;
   /** Jitter as a fraction of the computed delay (0.3 = +/-30%). */
   jitter: number;
+  /** Force a reconnect if a connect doesn't reach "connected" within this long. */
+  connectTimeoutMs: number;
 }
 
 export interface KickConfig {
@@ -115,6 +117,7 @@ export function loadConfig(): AppConfig {
       maxMs: int(process.env.RECONNECT_MAX_MS, 30000),
       factor: int(process.env.RECONNECT_FACTOR, 2),
       jitter: float(process.env.RECONNECT_JITTER, 0.3),
+      connectTimeoutMs: int(process.env.RECONNECT_CONNECT_TIMEOUT_MS, 15000),
     },
     logLevel: (str(process.env.LOG_LEVEL) as LogLevel) ?? "info",
   };

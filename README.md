@@ -159,6 +159,7 @@ http://localhost:8080/healthz
 | `font`   | `font=Arial`            | system stack | Font family                                    |
 | `badges` | `badges=0`              | `1`          | Show/hide badges                               |
 | `status` | `status=1`              | `0`          | Show the per-platform connection HUD           |
+| `thirdparty` | `thirdparty=0`      | `1`          | Load 7TV/BTTV/FFZ **global** emotes (Twitch)    |
 | `server` | `server=ws://host:8080` | same origin  | Point the overlay at a backend on another host |
 
 Example combining several:
@@ -185,6 +186,21 @@ http://localhost:8080/overlay.html?twitch=xqc&size=22&max=150&status=1
   fan-out WebSocket at `/feed`.
 - **`public/overlay.*`** — the transparent overlay; batches DOM writes per
   animation frame and caps the DOM for burst resilience.
+
+### Polish & resilience
+
+- **Emotes:** Twitch native + Kick inline emotes come from the message itself;
+  the overlay also loads **7TV / BTTV / FFZ global** emote sets into a shared
+  registry (extensible — add channel-scoped providers in one place). Message
+  emotes always win over globals. Toggle with `thirdparty=0`.
+- **Source pills:** colored Twitch/Kick/X pills with inline brand logos.
+- **Performance:** rAF-batched rendering, `contain` per row, a 200-message DOM
+  cap, async image decoding, and a queue cap so bursts on a hidden tab can't grow
+  memory unbounded.
+- **Reconnect hardening:** every ingester has exponential backoff + jitter **and**
+  a connect watchdog (no half-open hangs); the server pings overlay clients and
+  reaps dead sockets; the overlay reconnects with backoff and its own connect
+  timeout. One source failing never affects the others.
 
 ### Normalized message schema
 

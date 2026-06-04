@@ -1,10 +1,15 @@
 import * as fs from "fs";
 import * as http from "http";
 import * as path from "path";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, type WebSocket } from "ws";
 import type { AppConfig } from "./config";
 import type { Hub } from "./hub";
 import { logger } from "./logger";
+
+/** Interval between liveness pings to connected overlay clients. */
+const HEARTBEAT_MS = 30000;
+
+type Heartbeatable = WebSocket & { isAlive?: boolean };
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -57,7 +62,37 @@ export function createServer(hub: Hub, cfg: AppConfig): AppServer {
     }
   });
 
-  wss.on("connection", (ws, req) => hub.addClient(ws, req));
+  wss.on("connection", (ws, req) => {
+    // Heartbeat: mark alive on pong; the interval below reaps dead sockets.
+    (ws as Heartbeatable).isAlive = true;
+    ws.on("pong", () => {
+      (ws as Heartbeatable).isAlive = true;
+    });
+    hub.addClient(ws, req);
+  });
+
+  // Ping every client periodically; terminate any that missed the last pong.
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      const w = ws as Heartbeatable;
+      if (w.isAlive === false) {
+        try {
+          ws.terminate();
+        } catch {
+          /* ignore */
+        }
+        continue;
+      }
+      w.isAlive = false;
+      try {
+        ws.ping();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, HEARTBEAT_MS);
+  heartbeat.unref?.();
+  wss.on("close", () => clearInterval(heartbeat));
 
   return {
     listen() {

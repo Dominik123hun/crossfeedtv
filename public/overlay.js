@@ -12,11 +12,22 @@
      font=Arial              font-family override
      badges=0                hide badges
      status=1                show the per-platform connection HUD
+     thirdparty=0            disable 7TV/BTTV/FFZ global emotes (Twitch)
    ───────────────────────────────────────────────────────────────────────── */
 (function () {
   "use strict";
 
   const PLATFORM_LABELS = { twitch: "Twitch", kick: "Kick", x: "X" };
+
+  // Inline brand glyphs for the source pills (trusted constants, not user data).
+  const PLATFORM_LOGOS = {
+    twitch:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.3 0 1 3.3v13.4h4.6V20l3.3-3.3h2.7L17.7 11V0H4.3zm12 10.3-2.7 2.7H11l-2.3 2.3v-2.3H5.6V1.3h10.7v9z"/><path d="M14.7 3.7h-1.4v4h1.4v-4zm-3.7 0H9.6v4H11v-4z"/></svg>',
+    kick:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2h5.5v6.5L13 2h6.5l-6 8 6 8H13L8.5 11.5V18H3z"/></svg>',
+    x:
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.24 2.25h3.31l-7.23 8.26 8.5 11.24h-6.66l-5.21-6.82-5.97 6.82H1.68l7.73-8.84L1.25 2.25h6.83l4.71 6.23 5.45-6.23zm-1.16 17.52h1.83L7.08 4.13H5.12l11.96 15.64z"/></svg>',
+  };
   const BADGE_LABELS = {
     broadcaster: "HOST",
     moderator: "MOD",
@@ -44,6 +55,7 @@
     max: clampInt(params.get("max"), 200, 20, 1000),
     showBadges: params.get("badges") !== "0",
     showStatus: params.get("status") === "1",
+    thirdParty: params.get("thirdparty") !== "0",
   };
 
   applyTheme(cfg);
@@ -56,6 +68,57 @@
 
   if (cfg.showStatus) statusEl.classList.remove("hidden");
   maybeShowHint();
+
+  // ── Global emote registry (extensible: 7TV / BTTV / FFZ / …) ──────────────
+  // code -> url. Message-level emotes always take priority over these.
+  const globalEmotes = new Map();
+
+  // Each provider is a {url, parse} pair; add channel-scoped sets here later by
+  // pushing more providers (they only need to populate `globalEmotes`).
+  function loadThirdPartyEmotes() {
+    if (!cfg.thirdParty) return;
+    const providers = [
+      {
+        url: "https://api.betterttv.net/3/cached/emotes/global",
+        parse: (data) => {
+          (data || []).forEach((e) => {
+            if (e && e.code && e.id)
+              globalEmotes.set(e.code, "https://cdn.betterttv.net/emote/" + e.id + "/2x.webp");
+          });
+        },
+      },
+      {
+        url: "https://api.frankerfacez.com/v1/set/global",
+        parse: (data) => {
+          const sets = (data && data.sets) || {};
+          Object.keys(sets).forEach((k) => {
+            (sets[k].emoticons || []).forEach((e) => {
+              const u = e.urls && (e.urls["2"] || e.urls["1"]);
+              if (e.name && u) globalEmotes.set(e.name, u.indexOf("http") === 0 ? u : "https:" + u);
+            });
+          });
+        },
+      },
+      {
+        url: "https://7tv.io/v3/emote-sets/global",
+        parse: (data) => {
+          ((data && data.emotes) || []).forEach((e) => {
+            if (e && e.name && e.id)
+              globalEmotes.set(e.name, "https://cdn.7tv.app/emote/" + e.id + "/2x.webp");
+          });
+        },
+      },
+    ];
+    providers.forEach((p) => {
+      fetch(p.url)
+        .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+        .then((d) => p.parse(d))
+        .catch(() => {
+          /* enhancement only — message-level emotes still render */
+        });
+    });
+  }
+  loadThirdPartyEmotes();
 
   // ── WebSocket connection with auto-reconnect ──────────────────────────────
   const wsUrl = buildWsUrl(cfg);
@@ -70,7 +133,18 @@
       scheduleReconnect();
       return;
     }
+    // Connect watchdog: browsers don't time out a hanging WS connect.
+    let opened = false;
+    const watchdog = setTimeout(function () {
+      if (!opened) {
+        try {
+          ws.close();
+        } catch (e) {}
+      }
+    }, 10000);
     ws.onopen = function () {
+      opened = true;
+      clearTimeout(watchdog);
       backoff = 1000;
       setStatus("ws", "connected");
     };
@@ -78,6 +152,7 @@
       handleFrame(ev.data);
     };
     ws.onclose = function () {
+      clearTimeout(watchdog);
       setStatus("ws", "reconnecting");
       scheduleReconnect();
     };
@@ -117,6 +192,10 @@
       hintEl.classList.add("hidden");
     }
     queue.push(msg);
+    // Bound memory if rAF is throttled (e.g. hidden tab) during a heavy burst:
+    // only the most recent messages can ever be on screen anyway.
+    const cap = cfg.max * 4;
+    if (queue.length > cap) queue.splice(0, queue.length - cap);
     schedule();
   }
 
@@ -155,7 +234,11 @@
 
     const pill = document.createElement("span");
     pill.className = "pill " + safeClass(msg.platform);
-    pill.textContent = PLATFORM_LABELS[msg.platform] || msg.platform;
+    const logo = PLATFORM_LOGOS[msg.platform];
+    if (logo) pill.insertAdjacentHTML("afterbegin", logo); // trusted constant
+    const label = document.createElement("span");
+    label.textContent = PLATFORM_LABELS[msg.platform] || msg.platform;
+    pill.appendChild(label);
     row.appendChild(pill);
 
     if (cfg.showBadges && Array.isArray(msg.badges)) {
@@ -189,6 +272,7 @@
   }
 
   // Replace whole-token emote codes with <img>; everything else stays text.
+  // Message-level emotes (Twitch native, Kick) win over global 7TV/BTTV/FFZ.
   function renderText(container, text, emotes) {
     const map = new Map();
     if (Array.isArray(emotes)) {
@@ -201,7 +285,7 @@
     for (let i = 0; i < tokens.length; i++) {
       if (i > 0) container.appendChild(document.createTextNode(" "));
       const tok = tokens[i];
-      const url = map.get(tok);
+      const url = map.get(tok) || globalEmotes.get(tok);
       if (url) {
         const img = document.createElement("img");
         img.className = "emote";
@@ -209,6 +293,7 @@
         img.alt = tok;
         img.title = tok;
         img.loading = "lazy";
+        img.decoding = "async";
         img.onerror = function () {
           img.replaceWith(document.createTextNode(tok));
         };

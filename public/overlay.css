@@ -62,6 +62,8 @@ body {
   padding: 0.05em 0;
   text-shadow: var(--text-outline);
   animation: msg-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Isolate layout/paint per row so large feeds stay smooth. */
+  contain: content;
 }
 
 @keyframes msg-in {
@@ -101,6 +103,12 @@ body {
 .pill.x {
   background: var(--x);
   border: 1px solid var(--x-border);
+}
+.pill svg {
+  width: 1.05em;
+  height: 1.05em;
+  fill: currentColor;
+  flex: 0 0 auto;
 }
 
 /* ── Badges ── */
@@ -156,6 +164,7 @@ body {
   height: 1.6em;
   vertical-align: -0.35em;
   margin: 0 0.05em;
+  object-fit: contain;
 }
 
 /* ── Connection status HUD (?status=1) ── */

@@ -40,6 +40,7 @@ export abstract class BaseIngester {
 
   private attempt = 0;
   private timer?: ReturnType<typeof setTimeout>;
+  private connectTimer?: ReturnType<typeof setTimeout>;
   private stopped = true;
   private _state: IngesterState = "idle";
 
@@ -79,6 +80,7 @@ export abstract class BaseIngester {
       clearTimeout(this.timer);
       this.timer = undefined;
     }
+    this.clearConnectTimer();
     this.safeDisconnect();
     this.setState("stopped");
   }
@@ -96,6 +98,7 @@ export abstract class BaseIngester {
   /** Call once the connection + handshake succeeded. */
   protected onConnected(): void {
     if (this.stopped) return;
+    this.clearConnectTimer();
     this.attempt = 0;
     this.setState("connected");
     this.log.info(`connected (#${this.channel})`);
@@ -120,6 +123,7 @@ export abstract class BaseIngester {
   /** Report that the transport closed; schedules a reconnect unless stopped. */
   protected onClosed(info?: string): void {
     if (this.stopped) return;
+    this.clearConnectTimer();
     this.safeDisconnect();
     this.scheduleReconnect(info);
   }
@@ -129,11 +133,31 @@ export abstract class BaseIngester {
   private openConnection(): void {
     if (this.stopped) return;
     this.setState(this.attempt === 0 ? "connecting" : "reconnecting");
+    this.armConnectWatchdog();
     try {
       this.doConnect();
     } catch (err) {
       this.log.warn("connect threw", err);
       this.scheduleReconnect("connect exception");
+    }
+  }
+
+  /** If a connect attempt hangs without reaching "connected", force a retry. */
+  private armConnectWatchdog(): void {
+    this.clearConnectTimer();
+    const ms = this.reconnectCfg.connectTimeoutMs;
+    if (!ms || ms <= 0) return;
+    this.connectTimer = setTimeout(() => {
+      if (this.stopped || this._state === "connected") return;
+      this.log.warn(`connect watchdog fired after ${ms}ms`);
+      this.onClosed("connect timeout");
+    }, ms);
+  }
+
+  private clearConnectTimer(): void {
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = undefined;
     }
   }
 
