@@ -162,6 +162,49 @@ http://localhost:8080/healthz
 
 ---
 
+## Deploy it once → streamers run nothing (hosted)
+
+Host the backend on a public URL and a streamer only pastes an overlay link into
+OBS — no install, no local backend. The Hub spins up ingesters **on demand** from
+the overlay's query params, so one deployment serves everyone.
+
+A `Dockerfile` and `render.yaml` are included. The image is light (the optional
+Kick/Puppeteer deps are skipped — Kick uses the built-in Pusher fallback).
+
+**Render (Blueprint):**
+1. Push this repo to GitHub.
+2. Render → **New + → Blueprint** → pick the repo. It reads `render.yaml`, builds
+   the Dockerfile, terminates **TLS**, and proxies the `/feed` WebSocket.
+3. Your overlay is then live at:
+   ```
+   https://<your-app>.onrender.com/overlay.html?twitch=xqc&kick=xqc
+   ```
+   Give that URL to streamers; they add it as an OBS **Browser Source** (≈460×900,
+   transparent). That's it.
+
+**Railway:** New project → **Deploy from GitHub repo**. Railway auto-detects the
+`Dockerfile`, injects `PORT`, and gives an HTTPS URL with WebSocket support.
+
+**Any Docker host:**
+```bash
+docker build -t crossfeedtv .
+docker run -p 8080:8080 crossfeedtv
+```
+Put it behind a TLS reverse proxy (e.g. Caddy for automatic HTTPS) so the overlay
+can use `wss://` — OBS (Chromium) requires secure WebSockets on an HTTPS page. The
+overlay auto-selects `wss://` when served over HTTPS, so same-origin "just works".
+
+Notes:
+- Render's **free** plan sleeps when idle (cold start on first hit); use a paid
+  plan for always-on.
+- The backend is **open** by default (it'll join any channel in a URL). Fine for
+  personal/contest use; add an allowlist before exposing it widely.
+- At large scale (many distinct channels on one host) you'll hit **platform** rate
+  limits before the server strains — see the scaling notes in the chat history /
+  open an issue for Twitch connection-multiplexing.
+
+---
+
 ## Overlay query params
 
 | Param    | Example                 | Default      | Meaning                                        |

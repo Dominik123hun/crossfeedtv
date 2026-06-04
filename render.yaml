@@ -1,0 +1,23 @@
+# Render Blueprint — deploy CrossFeed.tv as a hosted backend so streamers only
+# paste an overlay URL into OBS (they run nothing locally).
+#
+# Use: push this repo to GitHub, then in Render → "New +" → "Blueprint" and
+# point it at the repo. Render builds the Dockerfile, terminates TLS, and
+# supports the WebSocket /feed endpoint. Set default channels (optional) in the
+# dashboard or below.
+services:
+  - type: web
+    name: crossfeedtv
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free # free spins down when idle (cold start); use "starter" for always-on
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: LOG_LEVEL
+        value: info
+      # Optional: pre-warm default channels (overlays can also pass them as query params)
+      # - key: TWITCH_CHANNEL
+      #   value: ""
+      # - key: KICK_CHANNEL
+      #   value: ""
