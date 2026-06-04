@@ -1,0 +1,238 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   CrossFeed.tv overlay styles
+   Transparent background; heavy text outline/shadow for legibility over any
+   video. Tunable via CSS variables that overlay.js sets from query params.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --font-size: 18px;
+  --font-family: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial,
+    sans-serif;
+
+  --twitch: #9146ff;
+  --kick: #53fc18;
+  --x: #000000;
+  --x-border: #3a3d40;
+
+  /* Text legibility: a tight black outline plus a soft drop shadow. */
+  --text-outline: -1px -1px 0 rgba(0, 0, 0, 0.95), 1px -1px 0 rgba(0, 0, 0, 0.95),
+    -1px 1px 0 rgba(0, 0, 0, 0.95), 1px 1px 0 rgba(0, 0, 0, 0.95),
+    0 0 4px rgba(0, 0, 0, 0.85), 0 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent; /* OBS Browser Source renders this as transparent */
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Chat container: anchored to the bottom, oldest scroll off the top ── */
+.chat {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.3em;
+  padding: 14px 16px;
+  overflow: hidden;
+}
+
+/* ── A single message row ── */
+.msg {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  line-height: 1.35;
+  padding: 0.05em 0;
+  text-shadow: var(--text-outline);
+  animation: msg-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Source pill ── */
+.pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-size: 0.66em;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18em 0.55em;
+  border-radius: 999px;
+  color: #fff;
+  text-shadow: none;
+  transform: translateY(-0.08em);
+}
+.pill.twitch {
+  background: var(--twitch);
+}
+.pill.kick {
+  background: var(--kick);
+  color: #08210a;
+}
+.pill.x {
+  background: var(--x);
+  border: 1px solid var(--x-border);
+}
+
+/* ── Badges ── */
+.badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62em;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.22em 0.4em;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.22);
+  text-shadow: none;
+  transform: translateY(-0.05em);
+}
+.badge.broadcaster {
+  background: #e2103a;
+}
+.badge.moderator {
+  background: #00ad03;
+}
+.badge.vip {
+  background: #e005b9;
+}
+.badge.subscriber,
+.badge.founder {
+  background: #6441a5;
+}
+.badge.premium,
+.badge.turbo {
+  background: #009cdc;
+}
+.badge.staff,
+.badge.admin,
+.badge.global_mod {
+  background: #5a3d8a;
+}
+
+/* ── Author + text ── */
+.author {
+  font-weight: 800;
+}
+.colon {
+  margin-left: -0.2em;
+  opacity: 0.85;
+}
+.text {
+  word-break: break-word;
+}
+.text img.emote {
+  height: 1.6em;
+  vertical-align: -0.35em;
+  margin: 0 0.05em;
+}
+
+/* ── Connection status HUD (?status=1) ── */
+.status {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: flex;
+  gap: 8px;
+  font:
+    600 12px/1 var(--font-family);
+  z-index: 10;
+}
+.status .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #888;
+}
+.status .dot.connected {
+  background: #2ecc40;
+}
+.status .dot.connecting,
+.status .dot.reconnecting {
+  background: #ffb000;
+}
+.status .dot.error,
+.status .dot.stopped {
+  background: #ff4136;
+}
+
+/* ── Setup hint ── */
+.hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+.hint .card {
+  max-width: 560px;
+  background: rgba(10, 10, 12, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 22px 26px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.hint h1 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+.hint code {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 0.92em;
+}
+.hint .muted {
+  opacity: 0.7;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.hidden {
+  display: none !important;
+}

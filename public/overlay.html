@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CrossFeed.tv Overlay</title>
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body>
+    <!-- Per-platform connection status; hidden unless ?status=1 -->
+    <div id="status" class="status hidden"></div>
+
+    <!-- Setup hint shown only until the first message arrives -->
+    <div id="hint" class="hint hidden"></div>
+
+    <!-- The merged chat feed. Newest messages appear at the bottom. -->
+    <main id="chat" class="chat" aria-live="polite"></main>
+
+    <script src="overlay.js"></script>
+  </body>
+</html>

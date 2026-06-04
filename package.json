@@ -1,0 +1,28 @@
+{
+  "name": "crossfeedtv",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CrossFeed.tv — a unified live-chat aggregator that merges Twitch, Kick, and X (Twitter) broadcast chat into one real-time OBS overlay.",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,17 @@
+import type { IngesterFactory } from "../hub";
+import type { Platform } from "../types";
+import { TwitchIngester } from "./twitch";
+
+/**
+ * Registry of per-platform ingester factories. Platforms absent from this map
+ * are silently skipped by the Hub, so the app stays runnable as platforms are
+ * added across the build steps.
+ *
+ *   step 1: twitch  (done)
+ *   step 2: kick
+ *   step 3: x
+ */
+export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
+  twitch: (channel, cfg, log, events) =>
+    new TwitchIngester(channel, cfg.reconnect, log, events, cfg.twitchWsUrl),
+};
