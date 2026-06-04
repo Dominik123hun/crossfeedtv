@@ -9,15 +9,37 @@ export interface ReconnectConfig {
   jitter: number;
 }
 
+export interface KickConfig {
+  /** Skip the @retconned/kick-js library and go straight to the Pusher adapter. */
+  forcePusher: boolean;
+  /** Base URL for the Cloudflare-protected channel lookup API. */
+  apiBase: string;
+  /** Pusher app key for Kick's chat cluster (see RECON.md — verify if it breaks). */
+  pusherAppKey: string;
+  pusherCluster: string;
+  pusherVersion: string;
+  /** If the library doesn't reach "ready" in this long, fall back to Pusher. */
+  readyTimeoutMs: number;
+}
+
 export interface AppConfig {
   host: string;
   port: number;
   publicDir: string;
   defaults: { twitch?: string; kick?: string; x?: string };
   twitchWsUrl: string;
+  kick: KickConfig;
   reconnect: ReconnectConfig;
   logLevel: LogLevel;
 }
+
+/**
+ * Kick's public Pusher app key (cluster us2). This value is observed from the
+ * browser, not documented, and can change — override via KICK_PUSHER_APP_KEY /
+ * KICK_PUSHER_CLUSTER. See RECON.md for how to capture the current values.
+ */
+const DEFAULT_KICK_PUSHER_APP_KEY = "32cbd69e4b950bf97679";
+const DEFAULT_KICK_PUSHER_CLUSTER = "us2";
 
 /** Load a .env file if present (Node >= 20.6). Silently ignore if missing. */
 function loadEnvFile(): void {
@@ -44,6 +66,11 @@ function str(value: string | undefined): string | undefined {
   return s.length ? s : undefined;
 }
 
+function bool(value: string | undefined): boolean {
+  const s = (value ?? "").trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes";
+}
+
 export function loadConfig(): AppConfig {
   loadEnvFile();
   return {
@@ -57,6 +84,14 @@ export function loadConfig(): AppConfig {
       x: str(process.env.X_BROADCAST_ID),
     },
     twitchWsUrl: str(process.env.TWITCH_WS_URL) ?? "wss://irc-ws.chat.twitch.tv:443",
+    kick: {
+      forcePusher: bool(process.env.KICK_FORCE_PUSHER),
+      apiBase: str(process.env.KICK_API_BASE) ?? "https://kick.com",
+      pusherAppKey: str(process.env.KICK_PUSHER_APP_KEY) ?? DEFAULT_KICK_PUSHER_APP_KEY,
+      pusherCluster: str(process.env.KICK_PUSHER_CLUSTER) ?? DEFAULT_KICK_PUSHER_CLUSTER,
+      pusherVersion: str(process.env.KICK_PUSHER_VERSION) ?? "8.4.0",
+      readyTimeoutMs: int(process.env.KICK_READY_TIMEOUT_MS, 20000),
+    },
     reconnect: {
       initialMs: int(process.env.RECONNECT_INITIAL_MS, 1000),
       maxMs: int(process.env.RECONNECT_MAX_MS, 30000),

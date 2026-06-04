@@ -21,9 +21,9 @@ everyone talking to you in one stream.
             └──────────────┘
 ```
 
-**Build status:** Step 1 complete — Twitch is fully wired and the app runs
-against live Twitch chat. Kick (step 2) and X (step 3) ingesters land next; the
-architecture already routes them.
+**Build status:** Steps 1–2 complete — **Twitch** is fully wired (live), and
+**Kick** is implemented (library-first with a built-in Pusher fallback). X
+(step 3) lands next; the architecture already routes it.
 
 ---
 
@@ -53,6 +53,26 @@ Channels can be set two ways:
   code or config changes.
 
 You don't need any API keys for Twitch — it connects anonymously (read-only).
+
+### Kick notes
+
+Kick has no public chat API, so the Kick ingester tries two paths:
+
+1. **`@retconned/kick-js`** (the maintained community library) in readOnly mode —
+   it handles the Cloudflare chatroom-id lookup and Pusher socket. It's an
+   **optional** dependency because it pulls in Puppeteer/Chromium. Install it
+   only if you want this path:
+   ```bash
+   npm install @retconned/kick-js
+   ```
+2. **Built-in Pusher fallback** (no extra deps) — used automatically if the
+   library isn't installed, errors, or never connects. Set `KICK_FORCE_PUSHER=true`
+   to always use it.
+
+The Pusher fallback needs Kick's chatroom id (looked up at runtime) and the
+Pusher app key/cluster (defaults ship in `.env.example`). Cloudflare blocks the
+lookup from many datacenter IPs (`403`) — see [`RECON.md`](./RECON.md) to capture
+working values or front it with a proxy via `KICK_API_BASE`.
 
 ## Run
 

@@ -1,5 +1,6 @@
 import type { IngesterFactory } from "../hub";
 import type { Platform } from "../types";
+import { KickIngester } from "./kick";
 import { TwitchIngester } from "./twitch";
 
 /**
@@ -8,10 +9,11 @@ import { TwitchIngester } from "./twitch";
  * added across the build steps.
  *
  *   step 1: twitch  (done)
- *   step 2: kick
+ *   step 2: kick    (done)
  *   step 3: x
  */
 export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
   twitch: (channel, cfg, log, events) =>
     new TwitchIngester(channel, cfg.reconnect, log, events, cfg.twitchWsUrl),
+  kick: (channel, cfg, log, events) => new KickIngester(channel, cfg, log, events),
 };

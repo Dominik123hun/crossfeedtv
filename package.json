@@ -19,6 +19,9 @@
   "dependencies": {
     "ws": "^8.18.0"
   },
+  "optionalDependencies": {
+    "@retconned/kick-js": "^0.5.4"
+  },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/ws": "^8.5.13",
