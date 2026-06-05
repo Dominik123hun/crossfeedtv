@@ -118,22 +118,27 @@ export async function getGuestToken(opts: XApiOpts = {}): Promise<string> {
  * bearer alone is enough for many public broadcasts.
  */
 export async function resolveBroadcast(broadcastId: string, opts: XApiOpts = {}): Promise<BroadcastInfo> {
-  const bearer = opts.bearer ?? DEFAULT_WEB_BEARER;
   const base = opts.xApiBase ?? X_API_BASE;
   const url = `${base}/broadcasts/show.json?ids=${encodeURIComponent(broadcastId)}&include_events=true`;
   const f = opts.fetchImpl ?? fetch;
-  const headers: Record<string, string> = { authorization: bearer, accept: "application/json" };
+  // broadcasts/show.json is PUBLIC — the reference client (offish) hits it with no
+  // auth at all, and an unexpected bearer makes it 404. So send a bare request by
+  // default; only authenticate when a logged-in session (cookies) or guest token
+  // is explicitly supplied, for gated broadcasts.
+  const headers: Record<string, string> = { accept: "application/json" };
   if (opts.authToken && opts.csrf) {
-    // Logged-in session: bearer + CSRF + cookies authenticate as the operator's
-    // account (one shared login resolves every public broadcast).
+    headers["authorization"] = opts.bearer ?? DEFAULT_WEB_BEARER;
     headers["x-csrf-token"] = opts.csrf;
     headers["cookie"] = `auth_token=${opts.authToken}; ct0=${opts.csrf}`;
   } else if (opts.guestToken) {
+    headers["authorization"] = opts.bearer ?? DEFAULT_WEB_BEARER;
     headers["x-guest-token"] = opts.guestToken;
   }
   const res = await f(url, { headers, signal: opts.signal });
   if (!res.ok) {
-    const hint = opts.authToken ? "auth expired/invalid?" : "needs login — set X_AUTH_TOKEN/X_CSRF";
+    const hint = opts.authToken
+      ? "auth invalid/expired or broadcast offline"
+      : "broadcast offline/not public, or gated (try X_AUTH_TOKEN/X_CSRF)";
     throw new Error(`broadcasts/show HTTP ${res.status} (${hint} — see RECON.md)`);
   }
   const json = (await res.json()) as Record<string, unknown>;

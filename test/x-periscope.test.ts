@@ -108,12 +108,14 @@ test("getChatAccess reads endpoint + access_token; throws when missing", async (
   );
 });
 
-test("resolveBroadcast hits broadcasts/show.json with the id, forwarding a guest token only when given", async () => {
+test("resolveBroadcast: public request sends NO auth; guest token adds the header", async () => {
   let seenUrl = "";
   let seenGuest: string | undefined;
+  let seenAuth: string | undefined;
   const spy = (async (url: string, init?: { headers?: Record<string, string> }) => {
     seenUrl = String(url);
     seenGuest = init?.headers?.["x-guest-token"];
+    seenAuth = init?.headers?.["authorization"];
     return {
       ok: true,
       status: 200,
@@ -122,13 +124,16 @@ test("resolveBroadcast hits broadcasts/show.json with the id, forwarding a guest
     };
   }) as unknown as typeof fetch;
 
-  await resolveBroadcast("BID-9", { fetchImpl: spy, guestToken: "G1" });
-  assert.match(seenUrl, /broadcasts\/show\.json\?ids=BID-9&include_events=true$/);
-  assert.equal(seenGuest, "G1");
-
-  // Without a guest token, the header is omitted (bearer-only).
+  // Public (default): bare request — no Authorization, no guest token (offish-style).
   await resolveBroadcast("BID-9", { fetchImpl: spy });
+  assert.match(seenUrl, /broadcasts\/show\.json\?ids=BID-9&include_events=true$/);
   assert.equal(seenGuest, undefined);
+  assert.equal(seenAuth, undefined, "public broadcasts/show must not send Authorization");
+
+  // With a guest token: bearer + x-guest-token are added.
+  await resolveBroadcast("BID-9", { fetchImpl: spy, guestToken: "G1" });
+  assert.equal(seenGuest, "G1");
+  assert.ok(seenAuth, "guest mode should send a bearer");
 });
 
 test("resolveBroadcast sends auth cookies + csrf when a logged-in session is configured", async () => {

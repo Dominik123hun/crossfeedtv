@@ -1,13 +1,6 @@
 import type { XConfig, XMode } from "../config";
 import type { Logger } from "../logger";
-import {
-  chatWsUrl,
-  getChatAccess,
-  getGuestToken,
-  isAuthError,
-  resolveBroadcast,
-  type XApiOpts,
-} from "./x-periscope";
+import { chatWsUrl, getChatAccess, resolveBroadcast, type XApiOpts } from "./x-periscope";
 
 /* ───────────────────────────────────────────────────────────────────────────
    X chat ACCESS layer — the scalable part of the design.
@@ -248,10 +241,6 @@ class BrowserAccessProvider implements XAccessProvider {
  */
 class PeriscopeAccessProvider implements XAccessProvider {
   readonly name = "periscope";
-  /** One guest token serves resolution for ALL broadcasts; minted once, refreshed lazily. */
-  private guestToken?: string;
-  private guestMintedAt = 0;
-  private static readonly GUEST_TTL_MS = 3 * 60 * 60 * 1000; // ~3h; refresh proactively
 
   constructor(
     private readonly cfg: XConfig,
@@ -259,63 +248,47 @@ class PeriscopeAccessProvider implements XAccessProvider {
     private readonly log: Logger,
   ) {}
 
-  /** True once a logged-in session is configured (cookies) — guest token then unneeded. */
+  /** Whether a logged-in session (cookies) is configured for the gated fallback. */
   private get authed(): boolean {
     return !!(this.cfg.authTokenCookie && this.cfg.csrfToken);
   }
 
-  private opts(guestToken?: string): XApiOpts {
+  /** Public request opts — no auth headers (the working path for public broadcasts). */
+  private publicOpts(): XApiOpts {
     return {
       xApiBase: this.cfg.apiBase,
       guestApiBase: this.cfg.guestApiBase,
       pscpApiBase: this.cfg.pscpBase,
       bearer: this.cfg.bearer,
-      guestToken,
-      authToken: this.cfg.authTokenCookie,
-      csrf: this.cfg.csrfToken,
+      guestToken: this.cfg.guestToken,
     };
   }
 
-  /**
-   * Best-effort: mint + cache a shared guest token. The activate.json endpoint is
-   * deprecated/flaky, so a failure is non-fatal — we fall back to resolving with
-   * just the public bearer (works for many public broadcasts).
-   */
-  private async ensureGuestToken(force = false): Promise<string> {
-    if (this.cfg.guestToken) return this.cfg.guestToken; // manual override (env)
-    const fresh = this.guestToken !== undefined && Date.now() - this.guestMintedAt < PeriscopeAccessProvider.GUEST_TTL_MS;
-    if (!force && fresh) return this.guestToken!;
-    try {
-      this.guestToken = await getGuestToken(this.opts());
-      this.log.debug("minted shared x guest token");
-    } catch (err) {
-      this.log.warn(`x guest token unavailable (${(err as Error).message}); resolving bearer-only`);
-      this.guestToken = ""; // sentinel: tried, none available
-    }
-    this.guestMintedAt = Date.now();
-    return this.guestToken;
+  /** Authenticated opts — adds the operator's cookies for gated broadcasts. */
+  private authOpts(): XApiOpts {
+    return { ...this.publicOpts(), authToken: this.cfg.authTokenCookie, csrf: this.cfg.csrfToken };
   }
 
   async getAccess(broadcastId: string): Promise<XAccess> {
+    const chatToken = await this.resolveChatToken(broadcastId);
+    // accessChatPublic is public — no auth headers.
+    const { endpoint, accessToken } = await getChatAccess(chatToken, this.publicOpts());
+    this.log.debug(`periscope access ok for ${broadcastId}`);
+    return { chatWsUrl: chatWsUrl(endpoint), accessToken, expiresAt: Date.now() + this.ttlMs };
+  }
+
+  private async resolveChatToken(broadcastId: string): Promise<string> {
     try {
-      return await this.attempt(broadcastId, false);
+      // Public first — broadcasts/show.json wants NO auth for public broadcasts.
+      return (await resolveBroadcast(broadcastId, this.publicOpts())).chatToken;
     } catch (err) {
-      // A stale/expired guest token shows up as 401/403 — refresh once and retry.
-      if (isAuthError(err)) {
-        this.log.warn("x guest auth rejected — refreshing guest token and retrying");
-        return this.attempt(broadcastId, true);
+      // Gated broadcast? Retry as the logged-in operator if cookies are configured.
+      if (this.authed) {
+        this.log.debug("public resolve failed; retrying with logged-in session");
+        return (await resolveBroadcast(broadcastId, this.authOpts())).chatToken;
       }
       throw err;
     }
-  }
-
-  private async attempt(broadcastId: string, forceGuest: boolean): Promise<XAccess> {
-    // A logged-in session authenticates directly — no (dead) guest token needed.
-    const guestToken = this.authed ? "" : await this.ensureGuestToken(forceGuest);
-    const { chatToken } = await resolveBroadcast(broadcastId, this.opts(guestToken));
-    const { endpoint, accessToken } = await getChatAccess(chatToken, this.opts());
-    this.log.debug(`periscope access ok for ${broadcastId}`);
-    return { chatWsUrl: chatWsUrl(endpoint), accessToken, expiresAt: Date.now() + this.ttlMs };
   }
 
   close(): void {}

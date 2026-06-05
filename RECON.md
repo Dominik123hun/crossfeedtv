@@ -136,23 +136,28 @@ A user enters a **broadcast id** or pastes the `x.com/i/broadcasts/<id>` URL
 (the id is parsed out). For a quick single-broadcast smoke test you can also set
 `X_BROADCAST_ID` and run with `X_ENABLED=true`.
 
-### Authentication — the guest path is dead; use a logged-in session
+### Authentication — public by default; cookies only for gated broadcasts
 
-X **deprecated the anonymous guest-token endpoint** (`guest/activate.json` now
-404s), and `broadcasts/show.json` then returns 404 without auth. The working path
-is **one shared logged-in session** (your account) — it resolves *every* user's
-public broadcast, so it still scales. Capture two cookies from a logged-in
-`x.com` tab (DevTools → **Application → Cookies → https://x.com**):
+`broadcasts/show.json` is a **public** endpoint — the resolver hits it with **no
+auth headers** (the reference client `offish` does the same; sending an unexpected
+`Authorization: Bearer …` makes it **404**). The deprecated guest-token endpoint
+is unused. So for a normal **public** broadcast you set **nothing** beyond
+`X_ENABLED=true`.
+
+If a specific broadcast is **gated** (the public resolve fails), the resolver
+retries as a logged-in operator when you supply one shared session — capture two
+cookies from a logged-in `x.com` tab (DevTools → **Application → Cookies →
+https://x.com**):
 
 | Cookie       | Env var        |
 | ------------ | -------------- |
 | `auth_token` | `X_AUTH_TOKEN` |
 | `ct0`        | `X_CSRF`       |
 
-Set both (keep `X_MODE=auto`) and the resolver authenticates as your account.
-Treat `auth_token` like a password — it's a full session token; it expires
-(re-capture when resolution starts 401ing), and automating a logged-in session is
-against X's ToS, so this stays a **beta/at-your-own-risk** capability.
+That one login resolves every user's gated broadcast (still scales). Treat
+`auth_token` like a password — it's a full session token, it expires (re-capture
+when it starts 401ing), and automating a logged-in session is against X's ToS, so
+it stays **beta/at-your-own-risk**. For a public broadcast you won't need it.
 
 ### If it breaks — verify each step in DevTools
 
