@@ -410,3 +410,33 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Redesign polish (cohesive with the landing visual language) ── */
+.auth-wrap {
+  position: relative;
+  isolation: isolate;
+}
+.auth-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(48% 46% at 50% 6%, rgba(124, 92, 255, 0.16), transparent 60%),
+    radial-gradient(42% 42% at 88% 102%, rgba(83, 252, 24, 0.05), transparent 60%);
+}
+.auth-card {
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px rgba(124, 92, 255, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.panel-title,
+.page-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+.preview {
+  box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.06);
+}
