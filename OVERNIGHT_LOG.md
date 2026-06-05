@@ -2,19 +2,50 @@
 
 ## SUMMARY (read me first)
 
-- **Branch:** `overnight/2026-06-05` (never touches `main`; no force-push/history rewrite)
-- **Status:** in progress — updated as work proceeds.
-- **Test suite:** a real, repeatable suite was added (`npm test`, Node's built-in
-  test runner via `tsx`, zero new deps) alongside `npm run build`. "Full suite" =
-  `npm run build` + `npm test`, run before every commit.
-- **What got better / commits / review items / skipped:** filled in below and
-  finalized at the end.
+- **Branch:** `overnight/2026-06-05` (off `main`; no commits to main, no
+  force-push, no history rewrite). Pushed to origin for review.
+- **Commits:** 8 (one per task; full suite green before each).
+- **Test status: GREEN.** `npm run build` clean; `npm test` = **64 passing, 0
+  failing**. There was no committed test suite before tonight — adding one (and
+  running it) is the night's biggest win.
+- **What got better:**
+  - A real, repeatable **test suite** (`npm test`, Node's built-in runner via
+    `tsx`, **zero new deps**): 64 tests over Store, auth, emote resolver, chat
+    parsers, the `BaseIngester` lifecycle, and end-to-end API + feed behavior.
+  - **2 real robustness bugs fixed** (found by the new tests): a malformed cookie
+    returned 500 (now 401); an oversized body reset the socket (now a clean 413).
+  - **Security hardening:** per-IP rate limiting on signup/login + `SECURITY.md`.
+  - **Accessibility:** labels, a global reduced-motion safety net, AA contrast bump.
+  - **Docs:** README testing/security sections; RECON Kick-official section.
+  - **Official Kick API groundwork** (OAuth + webhooks) as a separate, tested,
+    feature-flagged module — **OFF by default**, working WS ingester untouched.
 
-### Top things to review first
-- _TBD at end._
+### Top 3 things to review first
+1. **The 2 production fixes** (`src/auth.ts` cookie parse, `src/api.ts` oversized
+   body → 413 with `Connection: close`). Both correct + test-covered; just confirm
+   the 413 close behavior suits your proxy/host.
+2. **Official Kick adapter** (`src/ingesters/kick-official.ts`): it's OFF by
+   default and inert, but before enabling, verify the `TODO(kick-official)` items
+   against Kick's current docs (signed-content format, OAuth/subscribe endpoints,
+   header/field names). Enablement checklist is under "Item 7" below.
+3. **`SECURITY.md` → "Needs attention"**: the Store/sessions/rate-limiter are
+   per-process (fine for one instance, not multi-instance); no email-verify/
+   lockout yet; add HSTS/CSP at the proxy before real users.
 
-### NEEDS HUMAN REVIEW
-- _TBD — appended as encountered._
+### NEEDS HUMAN REVIEW / skipped (and why)
+- **No headless-DOM tests** for overlay/landing/dashboard *visual* behavior
+  (corner anchors, per-platform hide, panel, animations). That needs jsdom/
+  Playwright — a heavy dep, against the rules — so I covered the **contracts**
+  (the frames/settings the overlay consumes) and left a "eyeball in a browser"
+  note. Overlay settings rendering is the main thing to glance at visually.
+- **Official Kick OAuth/subscription network calls** are stubs (no credentials,
+  can't test, would be guesswork) — structured with TODOs only.
+- **Untouched on purpose:** working Kick/X ingesters, deploy/Docker/prod config,
+  secrets/`DATA_DIR`, and all existing TODOs (move Kick/X to official APIs;
+  no billing). No data deleted, nothing irreversible.
+- **Not in this backlog (deferred):** the earlier scaling track — Kick lookup
+  batching + X account/proxy rotation — is riskier and was a separate ask; left
+  for a supervised session.
 
 ---
 
