@@ -53,6 +53,8 @@ const CONTENT_TYPES: Record<string, string> = {
 export interface AppServer {
   listen(): Promise<void>;
   close(): void;
+  /** The actual bound TCP port (useful with port 0 / ephemeral ports in tests). */
+  port(): number;
 }
 
 /**
@@ -156,6 +158,10 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
       } catch {
         /* ignore */
       }
+    },
+    port() {
+      const addr = server.address();
+      return addr && typeof addr === "object" ? addr.port : cfg.port;
     },
   };
 }
