@@ -323,3 +323,8 @@ p {
   white-space: nowrap;
   border: 0;
 }
+
+/* Generic visibility utility used by the app scripts (auth/dashboard). */
+.hidden {
+  display: none !important;
+}
