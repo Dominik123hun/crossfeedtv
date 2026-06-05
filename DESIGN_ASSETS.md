@@ -34,7 +34,7 @@ source URL has expired, regenerate it from the prompt below (Higgsfield).
 | `public/assets/hero-mobile.webp` | Vertical hero variant — **dark/subtle**, convergence up top | job `35781963` (dark) | soul_location · 9:16 |
 | `public/assets/stream-scene.webp` | Abstract atmospheric "stream room" backdrop for the OBS section | job `63a268f1` | soul_location · 16:9 |
 | `public/assets/texture.webp` | Subtle section texture — quiet near-black depth (optional; CSS fallback ships) | job `e48c1d0c` | soul_location · 16:9 |
-| `public/assets/glyph.webp` + `icon.png` | Logo mark / favicon — lines merging into one node | job `8a03fdf0` | nano_banana_pro · 1:1 |
+| `public/assets/glyph.webp` | Logo mark / favicon (served as `image/webp`) — lines merging into one node | job `8a03fdf0` | nano_banana_pro · 1:1 |
 | `public/assets/og.webp` | Social share image — derived from the hero (1200×630 crop) | (from hero) | — |
 
 ### Download (ready-to-save WebP → target filename)
@@ -46,7 +46,7 @@ Save each into `public/assets/` with the name on the left:
 - `stream-scene.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152545_63a268f1-0036-4eb2-8a4a-0f7857339f1c_min.webp`
 - `texture.webp` (optional) → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_171712_e48c1d0c-60b3-4f35-a39e-29f418263dd7_min.webp`
 - `og.webp` → reuse the hero (copy `hero.webp` → `og.webp`), or download the hero WebP again under this name
-- `icon.png` (favicon, optional) → the glyph: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152536_8a03fdf0-79a0-432d-b347-52f0ed0d9035_min.webp` (save as PNG, or point the favicon at a `.webp` if you prefer)
+- `glyph.webp` (favicon) → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152536_8a03fdf0-79a0-432d-b347-52f0ed0d9035_min.webp` (the pages reference it via `<link rel="icon" href="/assets/glyph.webp" type="image/webp">`)
 
 These `_min.webp` links are already web-optimized WebP, so no conversion tool is
 needed. (The full-resolution originals are the same URLs without the `_min.webp`

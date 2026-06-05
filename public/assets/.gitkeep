@@ -1,4 +1,4 @@
 Brand image assets live here (generated via Higgsfield). This file just keeps the
 folder in git until the images are added. Expected filenames (see DESIGN_ASSETS.md):
-  hero.webp · hero-mobile.webp · stream-scene.webp · texture.webp · icon.png · og.webp
+  hero.webp · hero-mobile.webp · stream-scene.webp · texture.webp · glyph.webp · og.webp
 Add them by hand: download the WebPs and save them here with these exact names.
