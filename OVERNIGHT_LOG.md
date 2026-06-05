@@ -98,3 +98,25 @@
 - **Files:** `test/base-ingester.test.ts`. No production code changed.
 - **Tests:** build green; `npm test` = **56 passing**.
 - **Review:** none required.
+
+### Item 4 — Feature QA
+- All four features are **present and now covered by tests** (not stubbed):
+  1. **Test/preview feed** — isolation (firing user only), debounce (429), all-3
+     platforms, `test:true` flag, WS-triggered path, **and never persisted**.
+  2. **Per-source connection status** — `idle` for unset platforms, `connected`
+     when set, emitted live over the feed WS.
+  3. **Overlay customization** — settings frame on connect, **live push** on
+     change (no reconnect), persistence, clamping/enum validation.
+  4. **Emote completeness** — 7TV/BTTV/FFZ global+channel precedence, fail-soft,
+     native/3rd-party merge.
+- **Added** an explicit "test messages are never persisted" test (store on disk
+  holds only `users` + `sessions`; no test author/flag anywhere).
+- No feature bugs found beyond the two already fixed in item 1b. Overlay-side DOM
+  behavior (position/hide/panel CSS, status toggle) is applied from the verified
+  settings frame; not unit-tested here to avoid adding a DOM/jsdom dependency
+  (see review note).
+- **Files:** `test/feed.test.ts`.
+- **Tests:** build green; `npm test` = **57 passing**.
+- **Review:** overlay DOM rendering of settings (corner anchors, per-platform
+  hide, translucent panel) is covered by the contract test on the pushed frame
+  but not by a headless-DOM test — eyeball it once in a browser.

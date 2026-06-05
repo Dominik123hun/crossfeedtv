@@ -1,5 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import * as fs from "fs";
+import * as path from "path";
 import { startServer, httpReq, cookieOf, openFeed, sleep, type TestServer } from "./helpers";
 
 let srv: TestServer;
@@ -130,6 +132,22 @@ test("test feed: injected messages reach only the firing user, flagged test:true
   for (const f of aTest) assert.equal((f.msg as any).test, true, "every test message is flagged");
   fa.close();
   fb.close();
+});
+
+test("test messages are NEVER persisted (store holds only users + sessions)", async () => {
+  const a = await newUser({ twitch: "alpha" });
+  const fa = await openFeed(srv.wsBase, "/feed?token=" + a.token);
+  await fa.waitForType("hello");
+  await httpReq(srv.base, "POST", "/api/test", { cookie: a.cookie });
+  await sleep(2000);
+
+  const raw = fs.readFileSync(path.join(srv.dataDir, "crossfeed-db.json"), "utf8");
+  const db = JSON.parse(raw);
+  assert.deepEqual(Object.keys(db).sort(), ["sessions", "users"], "store schema unchanged");
+  // Test-message authors / flags must not appear anywhere on disk.
+  assert.ok(!raw.includes("test_ninja"), "test chat author must not be persisted");
+  assert.ok(!raw.includes('"test":true'), "test flag must not be persisted");
+  fa.close();
 });
 
 test("overlay-initiated test ({type:'test'} over WS) delivers to that user only", async () => {
