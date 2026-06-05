@@ -3,7 +3,8 @@ import { Hub } from "./hub";
 import { closeSharedResources, INGESTER_FACTORIES } from "./ingesters";
 import { logger, setLogLevel } from "./logger";
 import { createServer } from "./server";
-import { createStore } from "./store";
+import { createStore, type Store } from "./store";
+import { createSqliteStore } from "./store-sqlite";
 
 async function main(): Promise<void> {
   const cfg = loadConfig();
@@ -18,7 +19,19 @@ async function main(): Promise<void> {
   const hub = new Hub(cfg, INGESTER_FACTORIES);
   hub.start();
 
-  const store = createStore(cfg.dataDir);
+  let store: Store;
+  if (cfg.storeDriver === "sqlite") {
+    try {
+      store = createSqliteStore(cfg.dataDir);
+      log.info("data store: sqlite (node:sqlite)");
+    } catch (err) {
+      log.error("sqlite store failed to open; falling back to the JSON store", err);
+      store = createStore(cfg.dataDir);
+    }
+  } else {
+    store = createStore(cfg.dataDir);
+    log.info("data store: json");
+  }
   const app = createServer(hub, cfg, store);
   await app.listen();
 

@@ -13,8 +13,10 @@ import { randomId } from "./util";
  * a single-instance deployment. It's hidden behind the `Store` interface so it
  * can be swapped for Postgres/SQLite without touching the rest of the app.
  *
- * TODO(scale): for multi-instance hosting or durable data on ephemeral hosts
- * (e.g. Render without a mounted disk), replace createStore() with a real DB.
+ * For more users / row-level durability, set STORE_DRIVER=sqlite to use the
+ * node:sqlite-backed implementation in store-sqlite.ts (same interface; imports
+ * this file's data on first run). TODO(scale): for multi-instance hosting,
+ * point the Store at a networked DB (Postgres/Turso).
  */
 
 export interface UserChannels {

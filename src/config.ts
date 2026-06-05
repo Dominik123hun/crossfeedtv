@@ -79,6 +79,8 @@ export interface AppConfig {
   logLevel: LogLevel;
   /** Directory for the SaaS data store (users/sessions). */
   dataDir: string;
+  /** Data store backend: "json" (default, dependency-free file) or "sqlite" (node:sqlite). */
+  storeDriver?: "json" | "sqlite";
   /** Session lifetime in ms. */
   sessionTtlMs: number;
   /** Force/disable the Secure cookie flag; if undefined, inferred per-request. */
@@ -187,6 +189,7 @@ export function loadConfig(): AppConfig {
       str(process.env.DATA_DIR) ??
       str(process.env.RAILWAY_VOLUME_MOUNT_PATH) ??
       path.resolve(__dirname, "..", "data"),
+    storeDriver: str(process.env.STORE_DRIVER) === "sqlite" ? "sqlite" : "json",
     sessionTtlMs: int(process.env.SESSION_TTL_MS, 30 * 24 * 60 * 60 * 1000),
     cookieSecure:
       process.env.COOKIE_SECURE === undefined ? undefined : bool(process.env.COOKIE_SECURE),
