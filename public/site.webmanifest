@@ -1,0 +1,17 @@
+{
+  "name": "Crossfeed",
+  "short_name": "Crossfeed",
+  "description": "Twitch, X, and Kick live chat merged into one labeled real-time feed that drops straight into OBS.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#0a0a0c",
+  "icons": [
+    {
+      "src": "/assets/glyph.webp",
+      "sizes": "1024x1024",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}

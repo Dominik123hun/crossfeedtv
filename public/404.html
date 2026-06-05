@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crossfeed — Page not found</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" href="/assets/glyph.webp" type="image/webp" />
+    <meta name="theme-color" content="#0a0a0c" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+    <link rel="stylesheet" href="/theme.css" />
+    <style>
+      .err {
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        text-align: center;
+      }
+      .err .code {
+        font-family: var(--mono);
+        font-size: clamp(72px, 18vw, 160px);
+        font-weight: 600;
+        letter-spacing: -0.04em;
+        line-height: 0.9;
+        color: var(--text);
+      }
+      .err .code .dim {
+        color: var(--text-faint);
+      }
+      .err h1 {
+        margin: 20px 0 8px;
+        font-size: clamp(22px, 4vw, 30px);
+        letter-spacing: -0.015em;
+      }
+      .err p {
+        color: var(--text-dim);
+        max-width: 44ch;
+        margin: 0 auto 26px;
+        line-height: 1.6;
+      }
+      .err .actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="err">
+      <div>
+        <div class="code">4<span class="dim">0</span>4</div>
+        <h1>Page not found</h1>
+        <p>That link doesn't lead anywhere. It may have moved, or it never existed.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/">Back to home</a>
+          <a class="btn" href="/dashboard">Go to dashboard</a>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

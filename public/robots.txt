@@ -1,0 +1,9 @@
+# Crossfeed — only the marketing pages should be indexed.
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /login
+Disallow: /signup
+Disallow: /overlay
+Disallow: /api/
+Disallow: /healthz

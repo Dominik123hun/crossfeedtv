@@ -50,8 +50,46 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
   ".map": "application/json",
 };
+
+/** True when the client would rather see a page than a bare string (real navigations). */
+function wantsHtml(req: http.IncomingMessage): boolean {
+  return (req.headers.accept ?? "").includes("text/html");
+}
+
+/**
+ * Send a branded error page (public/404.html, public/500.html) for navigations,
+ * falling back to a plain string for asset/API-style requests or if the file is
+ * missing. Never throws.
+ */
+function serveErrorPage(root: string, res: http.ServerResponse, status: 404 | 500, asHtml: boolean): void {
+  if (res.headersSent) {
+    try {
+      res.end();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+  const plain = status === 404 ? "Not found" : "Server error";
+  if (!asHtml) {
+    res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
+    res.end(plain);
+    return;
+  }
+  fs.readFile(path.join(root, `${status}.html`), (err, buf) => {
+    if (err) {
+      res.writeHead(status, { "content-type": "text/plain; charset=utf-8" });
+      res.end(plain);
+      return;
+    }
+    res.writeHead(status, { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" });
+    res.end(buf);
+  });
+}
 
 export interface AppServer {
   listen(): Promise<void>;
@@ -71,6 +109,15 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
   const api = createApi({ store, hub, cfg });
 
   const server = http.createServer((req, res) => {
+    try {
+      handle(req, res);
+    } catch (err) {
+      log.warn("unhandled request error", err);
+      serveErrorPage(resolvedRoot, res, 500, wantsHtml(req));
+    }
+  });
+
+  function handle(req: http.IncomingMessage, res: http.ServerResponse): void {
     const url = new URL(req.url || "/", "http://localhost");
 
     // Official Kick webhook receiver — only mounted when explicitly enabled.
@@ -110,8 +157,8 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
     }
 
     const pathname = PAGES[url.pathname] ?? decodeURIComponent(url.pathname);
-    serveStatic(resolvedRoot, pathname, res);
-  });
+    serveStatic(resolvedRoot, pathname, res, wantsHtml(req));
+  }
 
   const wss = new WebSocketServer({ noServer: true });
 
@@ -207,7 +254,7 @@ function readRawBody(req: http.IncomingMessage, cb: (raw: string) => void): void
   req.on("error", () => cb(""));
 }
 
-function serveStatic(root: string, pathname: string, res: http.ServerResponse): void {
+function serveStatic(root: string, pathname: string, res: http.ServerResponse, asHtml: boolean): void {
   // Prevent path traversal: normalize then ensure the result stays under root.
   const safe = path.normalize(pathname).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(root, safe);
@@ -219,8 +266,7 @@ function serveStatic(root: string, pathname: string, res: http.ServerResponse): 
 
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) {
-      res.writeHead(404, { "content-type": "text/plain" });
-      res.end("Not found");
+      serveErrorPage(root, res, 404, asHtml);
       return;
     }
     const ext = path.extname(filePath).toLowerCase();
