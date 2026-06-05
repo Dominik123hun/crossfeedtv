@@ -284,7 +284,7 @@
   }
 
   // Progressive-enhance the hero/section/scene art if the optimized assets exist.
-  // Until they're fetched (see DESIGN_ASSETS.md), the premium CSS fallback shows.
+  // Until they're fetched (see DESIGN_ASSETS.md), the quiet near-black CSS fallback shows.
   function loadArt(selector, varName, src) {
     var nodes = document.querySelectorAll(selector);
     if (!nodes.length) return;
@@ -310,5 +310,6 @@
     loadArt(".hero-bg", "--hero-img", "/assets/hero.webp");
     loadArt(".hero-bg", "--hero-img-m", "/assets/hero-mobile.webp");
     loadArt(".stream-scene", "--scene-img", "/assets/stream-scene.webp");
+    loadArt(".section-alt", "--texture-img", "/assets/texture.webp");
   });
 })();

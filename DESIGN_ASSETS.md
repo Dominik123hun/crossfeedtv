@@ -8,9 +8,10 @@ redesign. Palette fed into every prompt: near-black base `#0a0a0c`, Twitch viole
 
 The assets are generated and hosted on Higgsfield's CDN, but the build sandbox
 **can't reach that CDN** (host not in allowlist), so they're **not bundled here
-yet**. The site ships with **premium CSS fallbacks** (gradients/grain) and
-progressively loads `/public/assets/*.webp` if present (see `landing.js`
-`loadArt()`), so it looks polished with or without the images.
+yet**. The site ships with **quiet near-black CSS fallbacks** and progressively
+loads `/public/assets/*.webp` if present (see `landing.js` `loadArt()`), so it
+looks polished with or without the images. Per the locked contract the hero art
+is intentionally **dark/subtle** — a backdrop, not a competitor to the feed.
 
 **To bundle the real images, add them by hand** (your browser can reach the CDN
 even though the build sandbox can't): download each WebP from the "Download"
@@ -29,20 +30,21 @@ source URL has expired, regenerate it from the prompt below (Higgsfield).
 
 | File (target) | What | Source (Higgsfield) | Model · ratio |
 | --- | --- | --- | --- |
-| `public/assets/hero.webp` | Hero background — three light ribbons converging into one stream, right-weighted, left negative space | job `d288c14c` | soul_location · 16:9 |
-| `public/assets/hero-mobile.webp` | Vertical hero variant (convergence up top) | job `a7c63cf3` | soul_location · 9:16 |
+| `public/assets/hero.webp` | Hero backdrop — **dark/subtle** convergence, right-weighted, deep left negative space for text | job `b9c3a49b` (dark) | soul_location · 16:9 |
+| `public/assets/hero-mobile.webp` | Vertical hero variant — **dark/subtle**, convergence up top | job `35781963` (dark) | soul_location · 9:16 |
 | `public/assets/stream-scene.webp` | Abstract atmospheric "stream room" backdrop for the OBS section | job `63a268f1` | soul_location · 16:9 |
+| `public/assets/texture.webp` | Subtle section texture — quiet near-black depth (optional; CSS fallback ships) | job `e48c1d0c` | soul_location · 16:9 |
 | `public/assets/glyph.webp` + `icon.png` | Logo mark / favicon — lines merging into one node | job `8a03fdf0` | nano_banana_pro · 1:1 |
 | `public/assets/og.webp` | Social share image — derived from the hero (1200×630 crop) | (from hero) | — |
-| section textures | Subtle section depth | **CSS-native** (gradients + grain) — no raster needed | — |
 
 ### Download (ready-to-save WebP → target filename)
 
 Save each into `public/assets/` with the name on the left:
 
-- `hero.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_151045_d288c14c-c260-424b-8aa4-d4e47ae85810_min.webp`
-- `hero-mobile.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152552_a7c63cf3-1b76-47f5-85c7-66e6ee067414_min.webp`
+- `hero.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_171216_b9c3a49b-43f1-444f-89e3-7643c7057bb4_min.webp`
+- `hero-mobile.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_171704_35781963-b49c-4e63-a99c-020cc22e7a77_min.webp`
 - `stream-scene.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152545_63a268f1-0036-4eb2-8a4a-0f7857339f1c_min.webp`
+- `texture.webp` (optional) → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_171712_e48c1d0c-60b3-4f35-a39e-29f418263dd7_min.webp`
 - `og.webp` → reuse the hero (copy `hero.webp` → `og.webp`), or download the hero WebP again under this name
 - `icon.png` (favicon, optional) → the glyph: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152536_8a03fdf0-79a0-432d-b347-52f0ed0d9035_min.webp` (save as PNG, or point the favicon at a `.webp` if you prefer)
 
@@ -52,13 +54,15 @@ suffix — `.png`/`.jpeg` — if you want to resize them yourself.)
 
 ## Prompts (to regenerate / swap)
 
-**Hero (16:9) & mobile (9:16):** "Premium abstract brand background for a
-live-streaming product. Three separate flowing ribbons of luminous light — one
-vivid violet (#9146FF), one bright neon green (#53FC18), one clean white —
-converging into a single unified luminous stream. Near-black cinematic base
-#0a0a0c, deep inky blacks, volumetric haze, soft bloom, delicate filaments. Calm
-dark negative space for text. Moody, high-end, restrained, no gradient soup. No
-text/logos/people/UI." (16:9 converges right; 9:16 converges top.)
+**Hero (16:9) & mobile (9:16) — dark/subtle (locked contract):** "Minimal,
+restrained abstract backdrop for a dark high-end developer product (Linear/Vercel
+grade). Mostly deep near-black #0a0a0c. In one corner only, three very faint thin
+filaments of light — a whisper of violet #9146FF, a whisper of green #53FC18, and
+white — converging into a single quiet line. Extremely low contrast, no bloom, no
+glow, no gradient soup, no saturated fills. Most of the frame is calm empty
+near-black negative space for text. Subtle, atmospheric, premium, quiet. No
+text/logos/people/UI." (16:9 converges far right; 9:16 converges top — keep it a
+backdrop, never a competitor to the live feed.)
 
 **Logo glyph (1:1, nano_banana_pro):** "Minimal abstract logo mark. Three thin
 luminous lines — violet #9146FF, neon green #53FC18, white — entering from the
@@ -69,6 +73,12 @@ glowing, centered, icon-like, solid near-black #0a0a0c background. No text/lette
 room at night — soft defocused bokeh, dark teal+violet ambient light, faint neon
 green glow, near-black #0a0a0c, volumetric haze, no identifiable objects.
 Cinematic, calm, low-contrast. No text/people/characters/game content/logos."
+
+**Section texture (16:9):** "Very subtle dark surface texture — near-black #0a0a0c
+with an almost-invisible fine grain and the faintest large-scale tonal variation.
+No color, no pattern, no objects, no light sources. Flat, quiet, low contrast,
+premium. Just barely-there depth for a dark UI section background. No
+text/logos/people."
 
 To swap any asset: regenerate in Higgsfield with an adjusted prompt and replace the
 file in `public/assets/` (keep the same filename), then commit.

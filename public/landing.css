@@ -264,6 +264,14 @@
   background: var(--bg-1);
   border-block: 1px solid var(--line-soft);
 }
+/* When the quiet texture asset is fetched, lay it on at a whisper over bg-1. */
+.section-alt.has-image {
+  background-image:
+    linear-gradient(0deg, rgba(15, 15, 19, 0.92), rgba(15, 15, 19, 0.92)),
+    var(--texture-img);
+  background-size: cover;
+  background-position: center;
+}
 .section-title {
   margin-top: 14px;
   font-size: clamp(30px, 4.4vw, 50px);
