@@ -40,20 +40,58 @@
 
 /* ── Hero ── */
 .hero {
-  padding: clamp(40px, 7vw, 92px) 0 clamp(36px, 5vw, 70px);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: clamp(56px, 9vw, 128px) 0 clamp(48px, 7vw, 96px);
+}
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* Premium fallback: three colored light pools converging toward the feed (right). */
+  background:
+    radial-gradient(58% 92% at 86% 40%, rgba(124, 92, 255, 0.32), transparent 60%),
+    radial-gradient(40% 66% at 72% 76%, rgba(83, 252, 24, 0.12), transparent 62%),
+    radial-gradient(46% 80% at 102% 26%, rgba(255, 255, 255, 0.1), transparent 58%);
+}
+/* The generated hero image, layered on top when present (wired by landing.js). */
+.hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  background: var(--hero-img, none) right center / cover no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 34%);
+  mask-image: linear-gradient(90deg, transparent, #000 34%);
+}
+.hero-bg.has-image::after {
+  opacity: 0.92;
+}
+/* Vignette so headline text stays crisp over either fallback or image. */
+.hero-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--bg) 8%, transparent 58%),
+    radial-gradient(120% 130% at 50% -10%, transparent 50%, rgba(0, 0, 0, 0.5));
 }
 .hero-grid {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: clamp(28px, 5vw, 64px);
+  grid-template-columns: 1.02fr 0.98fr;
+  gap: clamp(32px, 5vw, 72px);
   align-items: center;
 }
 .hero-copy .eyebrow {
   margin-bottom: 18px;
 }
 .hero-title {
-  font-size: clamp(40px, 6.4vw, 74px);
+  font-size: clamp(44px, 7vw, 82px);
   letter-spacing: -0.035em;
+  line-height: 0.98;
 }
 .hero-title .accent {
   background: linear-gradient(120deg, var(--accent-hi), #c4b5ff);
@@ -99,12 +137,16 @@
 
 /* ── The overlay frame (used in hero + OBS section) ── */
 .overlay-frame {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background:
-    radial-gradient(120% 120% at 50% 0%, rgba(124, 92, 255, 0.08), transparent 55%),
-    linear-gradient(180deg, #0e1014, #0b0d11);
-  box-shadow: var(--shadow);
+    radial-gradient(120% 120% at 50% 0%, rgba(124, 92, 255, 0.1), transparent 55%),
+    linear-gradient(180deg, #0d0d13, #0a0a0c);
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px rgba(124, 92, 255, 0.08),
+    0 30px 80px -30px var(--accent-glow);
   overflow: hidden;
 }
 .overlay-frame-bar {
@@ -364,7 +406,16 @@
   background:
     radial-gradient(60% 70% at 70% 30%, rgba(124, 92, 255, 0.22), transparent 60%),
     radial-gradient(50% 60% at 20% 80%, rgba(83, 252, 24, 0.12), transparent 60%),
-    linear-gradient(135deg, #15182250, #0b0d11), #0b0d11;
+    linear-gradient(135deg, #15182250, #0a0a0c), #0a0a0c;
+}
+/* When the generated atmospheric scene is fetched, layer it under tinting glows. */
+.stream-scene.has-image {
+  background-image:
+    radial-gradient(60% 70% at 70% 30%, rgba(124, 92, 255, 0.18), transparent 60%),
+    radial-gradient(50% 60% at 20% 80%, rgba(83, 252, 24, 0.1), transparent 60%),
+    var(--scene-img);
+  background-size: cover;
+  background-position: center;
 }
 .stream-grid {
   position: absolute;

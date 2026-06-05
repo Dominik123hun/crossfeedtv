@@ -6,21 +6,21 @@
    ───────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Base surfaces — near-black, never pure #000 */
-  --bg: #0b0d11;
-  --bg-1: #111419;
-  --bg-2: #161a21;
-  --bg-3: #1d222b;
-  --line: #272d37;
-  --line-soft: #1f242d;
+  /* Base surfaces — near-black, never pure #000 (slightly cool, cinematic) */
+  --bg: #0a0a0c;
+  --bg-1: #101016;
+  --bg-2: #16161f;
+  --bg-3: #1e1e29;
+  --line: #262630;
+  --line-soft: #1a1a22;
 
   /* Text */
-  --text: #eef1f5;
-  --text-dim: #a4adba;
-  /* bumped for AA contrast on the near-black base (was #6c7682) */
-  --text-faint: #7c8694;
+  --text: #f1f3f7;
+  --text-dim: #a6adba;
+  /* AA contrast on the near-black base */
+  --text-faint: #828b99;
 
-  /* Platform accents (the real brand colors) */
+  /* Platform accents (the real brand colors) — used sparingly as light */
   --twitch: #9146ff;
   --kick: #53fc18;
   --x: #ffffff;
@@ -28,21 +28,23 @@
 
   /* Brand accent — a violet of its own, so it doesn't read as "a Twitch tool" */
   --accent: #7c5cff;
-  --accent-hi: #9a80ff;
-  --accent-glow: rgba(124, 92, 255, 0.45);
+  --accent-hi: #9d83ff;
+  --accent-soft: rgba(124, 92, 255, 0.16);
+  --accent-glow: rgba(124, 92, 255, 0.5);
 
-  --radius: 16px;
-  --radius-sm: 10px;
+  --radius: 18px;
+  --radius-sm: 11px;
   --radius-xs: 7px;
-  --maxw: 1160px;
-  --nav-h: 64px;
+  --maxw: 1200px;
+  --nav-h: 68px;
 
   --font: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto,
     Helvetica, Arial, sans-serif;
+  --font-display: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
-  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  --shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -77,7 +79,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Subtle ambient backdrop — a couple of faint platform-colored glows, fixed. */
+/* Subtle ambient backdrop — faint platform-colored light, fixed, low-key. */
 body::before {
   content: "";
   position: fixed;
@@ -85,8 +87,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(40rem 40rem at 78% -10%, rgba(124, 92, 255, 0.14), transparent 60%),
-    radial-gradient(34rem 34rem at 5% 8%, rgba(83, 252, 24, 0.06), transparent 60%);
+    radial-gradient(46rem 40rem at 82% -12%, rgba(124, 92, 255, 0.12), transparent 60%),
+    radial-gradient(34rem 32rem at 2% 4%, rgba(83, 252, 24, 0.045), transparent 60%);
 }
 
 a {
@@ -98,9 +100,10 @@ h1,
 h2,
 h3 {
   margin: 0;
-  line-height: 1.08;
-  letter-spacing: -0.02em;
-  font-weight: 800;
+  font-family: var(--font-display);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
 p {
@@ -136,8 +139,9 @@ p {
 .wordmark {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-weight: 800;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 19px;
   letter-spacing: -0.02em;
   color: var(--text);
@@ -224,10 +228,12 @@ p {
 
 /* ── Cards & inputs ── */
 .card {
-  background: linear-gradient(180deg, var(--bg-1), var(--bg-1));
+  background: linear-gradient(180deg, #14141c, var(--bg-1));
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-soft);
+  box-shadow:
+    var(--shadow-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .field {

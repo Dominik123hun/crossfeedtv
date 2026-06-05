@@ -283,6 +283,21 @@
     targets.forEach(function (t) { io.observe(t); });
   }
 
+  // Progressive-enhance the hero/section/scene art if the optimized assets exist.
+  // Until they're fetched (see DESIGN_ASSETS.md), the premium CSS fallback shows.
+  function loadArt(selector, varName, src) {
+    var nodes = document.querySelectorAll(selector);
+    if (!nodes.length) return;
+    var im = new Image();
+    im.onload = function () {
+      nodes.forEach(function (n) {
+        n.style.setProperty(varName, 'url("' + src + '")');
+        n.classList.add("has-image");
+      });
+    };
+    im.src = src; // 404s gracefully -> CSS fallback stays
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", function () {
     injectCopy();
@@ -292,5 +307,7 @@
     runFeed(document.getElementById("heroFeed"), reduceMotion ? 9 : 5, !reduceMotion);
     runFeed(document.getElementById("obsFeed"), 6, false);
     setupReveal();
+    loadArt(".hero-bg", "--hero-img", "/assets/hero.webp");
+    loadArt(".stream-scene", "--scene-img", "/assets/stream-scene.webp");
   });
 })();

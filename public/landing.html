@@ -8,6 +8,20 @@
       name="description"
       content="Twitch, X, and Kick live chat merged into one labeled real-time feed that drops straight into OBS as a browser source."
     />
+    <link rel="icon" href="/assets/icon.png" type="image/png" />
+    <meta property="og:title" content="Crossfeed — Every chat, one feed" />
+    <meta
+      property="og:description"
+      content="Twitch, X, and Kick live chat merged into one labeled real-time feed, straight into OBS."
+    />
+    <meta property="og:image" content="/assets/og.webp" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"
+    />
     <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="landing.css" />
   </head>
@@ -30,10 +44,11 @@
     <main>
       <!-- ── Hero ── -->
       <section class="hero">
+        <div class="hero-bg" aria-hidden="true"></div>
         <div class="container hero-grid">
           <div class="hero-copy">
             <span class="eyebrow" data-copy="eyebrow"></span>
-            <h1 class="hero-title" data-copy="headline"></h1>
+            <h1 class="hero-title" data-copy-html="headlineHtml"></h1>
             <p class="hero-sub" data-copy="subhead"></p>
             <div class="hero-cta">
               <a class="btn btn-primary btn-lg" href="/signup" data-copy="ctaPrimary"></a>
