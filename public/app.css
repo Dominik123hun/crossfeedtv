@@ -136,6 +136,9 @@
   left: 22px;
   font-size: 14px;
   color: var(--text-dim);
+  /* Sit above .auth-wrap (which is a positioned, full-viewport layer) so the
+     link actually receives clicks instead of the wrap swallowing them. */
+  z-index: 2;
 }
 .auth-back:hover {
   color: var(--text);
