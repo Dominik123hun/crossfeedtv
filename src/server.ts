@@ -4,6 +4,7 @@ import * as path from "path";
 import { WebSocketServer, type WebSocket } from "ws";
 import { createApi } from "./api";
 import type { AppConfig } from "./config";
+import { createEmailSender, type EmailSender } from "./email";
 import type { FeedSubscription, Hub } from "./hub";
 import { handleKickWebhook } from "./ingesters/kick-official";
 import { logger } from "./logger";
@@ -21,6 +22,8 @@ const PAGES: Record<string, string> = {
   "/dashboard": "/dashboard.html",
   "/login": "/auth.html",
   "/signup": "/auth.html",
+  "/forgot": "/auth.html",
+  "/reset": "/auth.html",
 };
 
 /** Resolve which channels a /feed client should receive: by token (multi-tenant) or raw params (direct/demo). */
@@ -103,10 +106,15 @@ export interface AppServer {
  * /feed. The overlay being same-origin means it can open the feed socket with
  * zero extra config.
  */
-export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer {
+export function createServer(
+  hub: Hub,
+  cfg: AppConfig,
+  store: Store,
+  email: EmailSender = createEmailSender(cfg),
+): AppServer {
   const log = logger.child("http");
   const resolvedRoot = path.resolve(cfg.publicDir);
-  const api = createApi({ store, hub, cfg });
+  const api = createApi({ store, hub, cfg, email });
 
   const server = http.createServer((req, res) => {
     try {
@@ -153,6 +161,17 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
     if (url.pathname === "/healthz") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(hub.snapshot(), null, 2));
+      return;
+    }
+
+    // Email verification link (GET navigation): consume the token, then redirect
+    // to the login page with a status flag for the UI to show.
+    if (url.pathname === "/verify" && (req.method ?? "GET") === "GET") {
+      const token = (url.searchParams.get("token") ?? "").trim();
+      const userId = token ? store.useToken(token, "verify") : undefined;
+      if (userId) store.setEmailVerified(userId, true);
+      res.writeHead(302, { location: userId ? "/login?verified=1" : "/login?verify_error=1" });
+      res.end();
       return;
     }
 

@@ -2,6 +2,7 @@ import { loadConfig } from "./config";
 import { Hub } from "./hub";
 import { closeSharedResources, INGESTER_FACTORIES } from "./ingesters";
 import { logger, setLogLevel } from "./logger";
+import { createEmailSender } from "./email";
 import { createServer } from "./server";
 import { createStore, type Store } from "./store";
 import { createSqliteStore } from "./store-sqlite";
@@ -32,7 +33,11 @@ async function main(): Promise<void> {
     store = createStore(cfg.dataDir);
     log.info("data store: json");
   }
-  const app = createServer(hub, cfg, store);
+  const email = createEmailSender(cfg);
+  log.info(
+    `email sender: ${email.name}${cfg.requireEmailVerification ? " · email verification required" : ""}`,
+  );
+  const app = createServer(hub, cfg, store, email);
   await app.listen();
 
   const shutdown = (signal: string): void => {

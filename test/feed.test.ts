@@ -134,7 +134,7 @@ test("test feed: injected messages reach only the firing user, flagged test:true
   fb.close();
 });
 
-test("test messages are NEVER persisted (store holds only users + sessions)", async () => {
+test("test messages are NEVER persisted (store holds only users + sessions + tokens)", async () => {
   const a = await newUser({ twitch: "alpha" });
   const fa = await openFeed(srv.wsBase, "/feed?token=" + a.token);
   await fa.waitForType("hello");
@@ -143,7 +143,7 @@ test("test messages are NEVER persisted (store holds only users + sessions)", as
 
   const raw = fs.readFileSync(path.join(srv.dataDir, "crossfeed-db.json"), "utf8");
   const db = JSON.parse(raw);
-  assert.deepEqual(Object.keys(db).sort(), ["sessions", "users"], "store schema unchanged");
+  assert.deepEqual(Object.keys(db).sort(), ["sessions", "tokens", "users"], "store schema unchanged");
   // Test-message authors / flags must not appear anywhere on disk.
   assert.ok(!raw.includes("test_ninja"), "test chat author must not be persisted");
   assert.ok(!raw.includes('"test":true'), "test flag must not be persisted");

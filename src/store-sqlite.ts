@@ -52,6 +52,7 @@ interface UserRow {
   token: string;
   channels: string;
   settings: string;
+  email_verified: number;
 }
 
 export function createSqliteStore(dataDir: string): Store {
@@ -64,14 +65,15 @@ export function createSqliteStore(dataDir: string): Store {
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id            TEXT PRIMARY KEY,
-      email         TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      salt          TEXT NOT NULL,
-      created_at    INTEGER NOT NULL,
-      token         TEXT UNIQUE NOT NULL,
-      channels      TEXT NOT NULL DEFAULT '{}',
-      settings      TEXT NOT NULL
+      id             TEXT PRIMARY KEY,
+      email          TEXT UNIQUE NOT NULL,
+      password_hash  TEXT NOT NULL,
+      salt           TEXT NOT NULL,
+      created_at     INTEGER NOT NULL,
+      token          TEXT UNIQUE NOT NULL,
+      channels       TEXT NOT NULL DEFAULT '{}',
+      settings       TEXT NOT NULL,
+      email_verified INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS sessions (
       id         TEXT PRIMARY KEY,
@@ -80,17 +82,24 @@ export function createSqliteStore(dataDir: string): Store {
       expires_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+    CREATE TABLE IF NOT EXISTS tokens (
+      token      TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind       TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens(user_id);
     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
   `);
 
   const stmt = {
     insertUser: db.prepare(
-      `INSERT INTO users (id, email, password_hash, salt, created_at, token, channels, settings)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, password_hash, salt, created_at, token, channels, settings, email_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     insertUserIgnore: db.prepare(
-      `INSERT OR IGNORE INTO users (id, email, password_hash, salt, created_at, token, channels, settings)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO users (id, email, password_hash, salt, created_at, token, channels, settings, email_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     byEmail: db.prepare("SELECT * FROM users WHERE email = ?"),
     byId: db.prepare("SELECT * FROM users WHERE id = ?"),
@@ -99,6 +108,8 @@ export function createSqliteStore(dataDir: string): Store {
     setChannels: db.prepare("UPDATE users SET channels = ? WHERE id = ?"),
     setSettings: db.prepare("UPDATE users SET settings = ? WHERE id = ?"),
     setToken: db.prepare("UPDATE users SET token = ? WHERE id = ?"),
+    setVerified: db.prepare("UPDATE users SET email_verified = ? WHERE id = ?"),
+    setPassword: db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?"),
     deleteUser: db.prepare("DELETE FROM users WHERE id = ?"),
     insertSession: db.prepare(
       "INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
@@ -108,6 +119,12 @@ export function createSqliteStore(dataDir: string): Store {
     ),
     getSession: db.prepare("SELECT * FROM sessions WHERE id = ?"),
     deleteSession: db.prepare("DELETE FROM sessions WHERE id = ?"),
+    deleteUserSessions: db.prepare("DELETE FROM sessions WHERE user_id = ?"),
+    insertAuthToken: db.prepare(
+      "INSERT INTO tokens (token, user_id, kind, expires_at) VALUES (?, ?, ?, ?)",
+    ),
+    getAuthToken: db.prepare("SELECT * FROM tokens WHERE token = ?"),
+    deleteAuthToken: db.prepare("DELETE FROM tokens WHERE token = ?"),
     metaGet: db.prepare("SELECT value FROM meta WHERE key = ?"),
     metaSet: db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)"),
     userCount: db.prepare("SELECT COUNT(*) AS c FROM users"),
@@ -123,6 +140,7 @@ export function createSqliteStore(dataDir: string): Store {
       token: row.token,
       channels: parseChannels(row.channels),
       settings: parseSettings(row.settings),
+      emailVerified: !!Number(row.email_verified),
     };
   }
 
@@ -160,6 +178,8 @@ export function createSqliteStore(dataDir: string): Store {
             u.token,
             JSON.stringify(u.channels ?? {}),
             JSON.stringify(u.settings ?? DEFAULT_OVERLAY_SETTINGS),
+            // Grandfather pre-verification accounts as verified.
+            u.emailVerified === false ? 0 : 1,
           );
         }
         for (const s of Object.values(sessions)) {
@@ -186,6 +206,7 @@ export function createSqliteStore(dataDir: string): Store {
         channels: {},
         token: uniqueToken(),
         settings: { ...DEFAULT_OVERLAY_SETTINGS },
+        emailVerified: false,
       };
       stmt.insertUser.run(
         user.id,
@@ -196,6 +217,7 @@ export function createSqliteStore(dataDir: string): Store {
         user.token,
         JSON.stringify(user.channels),
         JSON.stringify(user.settings),
+        0,
       );
       return user;
     },
@@ -240,8 +262,22 @@ export function createSqliteStore(dataDir: string): Store {
       return rowToUser({ ...row, token });
     },
 
+    setEmailVerified(id, verified) {
+      const row = stmt.byId.get(id) as UserRow | undefined;
+      if (!row) return undefined;
+      stmt.setVerified.run(verified ? 1 : 0, id);
+      return rowToUser({ ...row, email_verified: verified ? 1 : 0 });
+    },
+
+    updatePassword(id, passwordHash, salt) {
+      const row = stmt.byId.get(id) as UserRow | undefined;
+      if (!row) return undefined;
+      stmt.setPassword.run(passwordHash, salt, id);
+      return rowToUser({ ...row, password_hash: passwordHash, salt });
+    },
+
     deleteUser(id) {
-      // Sessions cascade via the foreign key.
+      // Sessions + tokens cascade via their foreign keys.
       stmt.deleteUser.run(id);
     },
 
@@ -275,6 +311,26 @@ export function createSqliteStore(dataDir: string): Store {
 
     deleteSession(id) {
       stmt.deleteSession.run(id);
+    },
+
+    deleteSessionsForUser(userId) {
+      stmt.deleteUserSessions.run(userId);
+    },
+
+    createToken(userId, kind, ttlMs) {
+      const token = randomBytes(24).toString("hex");
+      const entry = { token, userId, kind, expiresAt: Date.now() + ttlMs };
+      stmt.insertAuthToken.run(entry.token, entry.userId, entry.kind, entry.expiresAt);
+      return entry;
+    },
+
+    useToken(token, kind) {
+      const row = stmt.getAuthToken.get(token) as
+        | { token: string; user_id: string; kind: string; expires_at: number }
+        | undefined;
+      if (!row || row.kind !== kind) return undefined;
+      stmt.deleteAuthToken.run(token); // single-use
+      return Number(row.expires_at) >= Date.now() ? row.user_id : undefined;
     },
   };
 }

@@ -87,6 +87,12 @@ export interface AppConfig {
   cookieSecure?: boolean;
   /** Rate limiting for auth endpoints (signup/login), per client IP. */
   auth: { rateMax: number; rateWindowMs: number };
+  /** Transactional email (verification + password reset). */
+  email: { provider: "resend" | "log"; resendApiKey?: string; from: string };
+  /** Public base URL for links in emails; if unset, derived from the request. */
+  appBaseUrl?: string;
+  /** Require a verified email before login is allowed. */
+  requireEmailVerification: boolean;
   /** Official Kick adapter (OAuth + webhooks). OFF by default — groundwork only. */
   kickOfficial: {
     enabled: boolean;
@@ -197,6 +203,18 @@ export function loadConfig(): AppConfig {
       rateMax: int(process.env.AUTH_RATE_MAX, 20),
       rateWindowMs: int(process.env.AUTH_RATE_WINDOW_MS, 5 * 60 * 1000),
     },
+    email: {
+      provider: str(process.env.RESEND_API_KEY) ? "resend" : "log",
+      resendApiKey: str(process.env.RESEND_API_KEY),
+      from: str(process.env.EMAIL_FROM) ?? "Crossfeed <onboarding@resend.dev>",
+    },
+    appBaseUrl: str(process.env.APP_BASE_URL)?.replace(/\/+$/, ""),
+    // Default ON: new signups must verify. Existing accounts are grandfathered
+    // as verified by the store, so this never locks out current users.
+    requireEmailVerification:
+      process.env.REQUIRE_EMAIL_VERIFICATION === undefined
+        ? true
+        : bool(process.env.REQUIRE_EMAIL_VERIFICATION),
     kickOfficial: {
       enabled: bool(process.env.KICK_OFFICIAL_ENABLED),
       clientId: str(process.env.KICK_CLIENT_ID),

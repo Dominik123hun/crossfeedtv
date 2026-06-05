@@ -83,6 +83,13 @@ function makeFakeFactories(bus: FakeBus): Partial<Record<Platform, IngesterFacto
   return { twitch: make("twitch"), kick: make("kick"), x: make("x") };
 }
 
+export interface SentEmail {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}
+
 export interface TestServer {
   base: string;
   wsBase: string;
@@ -91,6 +98,8 @@ export interface TestServer {
   hub: Hub;
   bus: FakeBus;
   dataDir: string;
+  /** Emails the server "sent" during the test (recording transport). */
+  sentEmails: SentEmail[];
   close(): Promise<void>;
 }
 
@@ -102,6 +111,8 @@ export interface TestServerOptions {
   /** Official Kick adapter (off by default). */
   kickOfficialEnabled?: boolean;
   kickEventPublicKeyPem?: string;
+  /** Require email verification before login (off by default so most tests log in directly). */
+  requireEmailVerification?: boolean;
 }
 
 export async function startServer(opts: TestServerOptions = {}): Promise<TestServer> {
@@ -120,6 +131,8 @@ export async function startServer(opts: TestServerOptions = {}): Promise<TestSer
     sessionTtlMs: opts.sessionTtlMs ?? 30 * 24 * 60 * 60 * 1000,
     cookieSecure: false,
     auth: { rateMax: opts.authRateMax ?? 100000, rateWindowMs: opts.authRateWindowMs ?? 60000 },
+    email: { provider: "log", from: "Crossfeed <test@crossfeed.test>" },
+    requireEmailVerification: opts.requireEmailVerification ?? false,
     kickOfficial: {
       enabled: opts.kickOfficialEnabled ?? false,
       webhookPath: "/webhooks/kick",
@@ -130,7 +143,14 @@ export async function startServer(opts: TestServerOptions = {}): Promise<TestSer
   const hub = new Hub(cfg, makeFakeFactories(bus));
   hub.start();
   const store = createStore(dataDir);
-  const app: AppServer = createServer(hub, cfg, store);
+  const sentEmails: SentEmail[] = [];
+  const email = {
+    name: "test",
+    async send(msg: SentEmail) {
+      sentEmails.push(msg);
+    },
+  };
+  const app: AppServer = createServer(hub, cfg, store, email);
   await app.listen();
   const port = app.port();
   return {
@@ -141,6 +161,7 @@ export async function startServer(opts: TestServerOptions = {}): Promise<TestSer
     hub,
     bus,
     dataDir,
+    sentEmails,
     async close() {
       try {
         hub.stop();
