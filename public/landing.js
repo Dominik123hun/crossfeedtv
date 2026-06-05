@@ -308,6 +308,7 @@
     runFeed(document.getElementById("obsFeed"), 6, false);
     setupReveal();
     loadArt(".hero-bg", "--hero-img", "/assets/hero.webp");
+    loadArt(".hero-bg", "--hero-img-m", "/assets/hero-mobile.webp");
     loadArt(".stream-scene", "--scene-img", "/assets/stream-scene.webp");
   });
 })();
