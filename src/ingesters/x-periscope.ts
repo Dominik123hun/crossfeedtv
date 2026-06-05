@@ -18,8 +18,10 @@ import WebSocket from "ws";
    need a live capture to confirm are marked TODO(recon); see RECON.md.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/** Modern x.com API base (guest token + broadcast resolution). Override: X_API_BASE. */
+/** x.com API base for broadcast resolution (broadcasts/show.json). Override: X_API_BASE. */
 export const X_API_BASE = "https://api.x.com/1.1";
+/** Guest-token host — activate.json has long lived on api.twitter.com. Override: X_GUEST_API_BASE. */
+export const GUEST_API_BASE = "https://api.twitter.com/1.1";
 /** Periscope API base for chat access. Override: X_PSCP_BASE. */
 export const PSCP_API_BASE = "https://proxsee.pscp.tv/api/v2";
 
@@ -35,8 +37,10 @@ const DEFAULT_WEB_BEARER =
 const CHAT_WS_PATH = "/chatapi/v1/chatnow";
 
 export interface XApiOpts {
-  /** api.x.com base (guest token + broadcasts/show). */
+  /** api.x.com base for broadcasts/show. */
   xApiBase?: string;
+  /** Host for the guest-token activate.json (api.twitter.com). */
+  guestApiBase?: string;
   /** Periscope base for accessChatPublic. */
   pscpApiBase?: string;
   /** Web bearer for guest auth (override X_BEARER). */
@@ -88,9 +92,9 @@ export function isAuthError(err: unknown): boolean {
   return /HTTP (401|403)\b/.test(m);
 }
 
-/** Step 0: mint a guest token from the public bearer. */
+/** Step 0: mint a guest token from the public bearer (best-effort; deprecated endpoint). */
 export async function getGuestToken(opts: XApiOpts = {}): Promise<string> {
-  const base = opts.xApiBase ?? X_API_BASE;
+  const base = opts.guestApiBase ?? GUEST_API_BASE;
   const f = opts.fetchImpl ?? fetch;
   const res = await f(`${base}/guest/activate.json`, {
     method: "POST",
@@ -104,17 +108,19 @@ export async function getGuestToken(opts: XApiOpts = {}): Promise<string> {
   return token;
 }
 
-/** Step 1: resolve a broadcast id → its chat token (modern x.com path). */
+/**
+ * Step 1: resolve a broadcast id → its chat token. Sends a guest token only if
+ * one is supplied (it's optional/best-effort — see the provider); the public
+ * bearer alone is enough for many public broadcasts.
+ */
 export async function resolveBroadcast(broadcastId: string, opts: XApiOpts = {}): Promise<BroadcastInfo> {
   const bearer = opts.bearer ?? DEFAULT_WEB_BEARER;
-  const guestToken = opts.guestToken ?? (await getGuestToken(opts));
   const base = opts.xApiBase ?? X_API_BASE;
   const url = `${base}/broadcasts/show.json?ids=${encodeURIComponent(broadcastId)}&include_events=true`;
   const f = opts.fetchImpl ?? fetch;
-  const res = await f(url, {
-    headers: { authorization: bearer, "x-guest-token": guestToken, accept: "application/json" },
-    signal: opts.signal,
-  });
+  const headers: Record<string, string> = { authorization: bearer, accept: "application/json" };
+  if (opts.guestToken) headers["x-guest-token"] = opts.guestToken;
+  const res = await f(url, { headers, signal: opts.signal });
   if (!res.ok) throw new Error(`broadcasts/show HTTP ${res.status} (offline/not public? see RECON.md)`);
   const json = (await res.json()) as Record<string, unknown>;
   const chatToken = extractChatToken(json, broadcastId);

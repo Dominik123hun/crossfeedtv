@@ -99,8 +99,8 @@ backend, resolved through the modern **x.com guest API**. The ingester implement
 this as testable functions in
 [`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts):
 
-0. `getGuestToken()` → `POST https://api.x.com/1.1/guest/activate.json` (public web bearer) → `guest_token`
-1. `resolveBroadcast(id)` → `GET https://api.x.com/1.1/broadcasts/show.json?ids={id}&include_events=true` (bearer + `x-guest-token`) → `chat_token`
+0. `getGuestToken()` → `POST https://api.twitter.com/1.1/guest/activate.json` (public web bearer) → `guest_token` — **best-effort**; deprecated, so a failure is non-fatal and resolution falls back to bearer-only.
+1. `resolveBroadcast(id)` → `GET https://api.x.com/1.1/broadcasts/show.json?ids={id}&include_events=true` (bearer, plus `x-guest-token` when available) → `chat_token`
 2. `getChatAccess(chatToken)` → `GET https://proxsee.pscp.tv/api/v2/accessChatPublic?chat_token={chat_token}` → `{ endpoint, access_token }`
 3. `connectChat({ wsUrl, accessToken, broadcastId })` → open `wss://{endpoint}/chatapi/v1/chatnow`, send the **auth** then **join** frame, parse `{ kind, payload }` frames.
 
@@ -169,7 +169,8 @@ Run `npm run x:probe -- <id>` first; it tells you which step fails. Then:
 | Env var            | Meaning                                                            |
 | ------------------ | ----------------------------------------------------------------- |
 | `X_ENABLED`        | Beta flag — must be `true` for X to connect (default off).        |
-| `X_API_BASE`       | x.com API base (default `https://api.x.com/1.1`).                 |
+| `X_API_BASE`       | x.com API base for resolve (default `https://api.x.com/1.1`).     |
+| `X_GUEST_API_BASE` | Guest-token host (default `https://api.twitter.com/1.1`).         |
 | `X_PSCP_BASE`      | Periscope chat base (default `https://proxsee.pscp.tv/api/v2`).   |
 | `X_BEARER`         | Override the public web bearer if guest auth 401s.                |
 | `X_GUEST_TOKEN`    | Pre-minted guest token (skips `activate.json`).                   |

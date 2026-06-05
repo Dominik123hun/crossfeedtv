@@ -71,31 +71,25 @@ test("getGuestToken posts to activate.json and returns the guest_token", async (
   );
 });
 
-test("resolveBroadcast mints a guest token then reads chat_token from broadcasts/show.json", async () => {
+test("resolveBroadcast reads chat_token from broadcasts/show.json (bearer-only, no mint)", async () => {
+  // No guest token needed — resolveBroadcast is a single call.
   const ok = await resolveBroadcast("BID", {
-    fetchImpl: route([GUEST, { match: "broadcasts/show.json", body: { broadcasts: { BID: { chat_token: "CT123" } } } }]),
+    fetchImpl: route([{ match: "broadcasts/show.json", body: { broadcasts: { BID: { chat_token: "CT123" } } } }]),
   });
   assert.equal(ok.chatToken, "CT123");
 
   // show.json non-200 -> throws
   await assert.rejects(
-    () =>
-      resolveBroadcast("BID", {
-        fetchImpl: route([GUEST, { match: "broadcasts/show.json", body: {}, ok: false, status: 404 }]),
-      }),
+    () => resolveBroadcast("BID", { fetchImpl: route([{ match: "broadcasts/show.json", body: {}, ok: false, status: 404 }]) }),
     /broadcasts\/show HTTP 404/,
   );
   // present but no chat_token -> throws
   await assert.rejects(
-    () =>
-      resolveBroadcast("BID", {
-        fetchImpl: route([GUEST, { match: "broadcasts/show.json", body: { broadcasts: { BID: {} } } }]),
-      }),
+    () => resolveBroadcast("BID", { fetchImpl: route([{ match: "broadcasts/show.json", body: { broadcasts: { BID: {} } } }]) }),
     /no chat_token/,
   );
-  // a pre-minted guest token skips activate.json (top-level chat_token shape).
+  // top-level chat_token shape also works (defensive extractor).
   const ok2 = await resolveBroadcast("BID", {
-    guestToken: "G9",
     fetchImpl: route([{ match: "broadcasts/show.json", body: { chat_token: "CT9" } }]),
   });
   assert.equal(ok2.chatToken, "CT9");
@@ -114,16 +108,12 @@ test("getChatAccess reads endpoint + access_token; throws when missing", async (
   );
 });
 
-test("resolveBroadcast requests broadcasts/show.json with the id + x-guest-token", async () => {
+test("resolveBroadcast hits broadcasts/show.json with the id, forwarding a guest token only when given", async () => {
   let seenUrl = "";
-  let seenGuest = "";
+  let seenGuest: string | undefined;
   const spy = (async (url: string, init?: { headers?: Record<string, string> }) => {
-    const u = String(url);
-    if (u.includes("guest/activate.json")) {
-      return { ok: true, status: 200, json: async () => ({ guest_token: "G1" }), text: async () => "" };
-    }
-    seenUrl = u;
-    seenGuest = (init && init.headers && init.headers["x-guest-token"]) || "";
+    seenUrl = String(url);
+    seenGuest = init?.headers?.["x-guest-token"];
     return {
       ok: true,
       status: 200,
@@ -131,9 +121,14 @@ test("resolveBroadcast requests broadcasts/show.json with the id + x-guest-token
       text: async () => "",
     };
   }) as unknown as typeof fetch;
-  await resolveBroadcast("BID-9", { fetchImpl: spy });
+
+  await resolveBroadcast("BID-9", { fetchImpl: spy, guestToken: "G1" });
   assert.match(seenUrl, /broadcasts\/show\.json\?ids=BID-9&include_events=true$/);
   assert.equal(seenGuest, "G1");
+
+  // Without a guest token, the header is omitted (bearer-only).
+  await resolveBroadcast("BID-9", { fetchImpl: spy });
+  assert.equal(seenGuest, undefined);
 });
 
 // ── WS URL + frames ───────────────────────────────────────────────────────────

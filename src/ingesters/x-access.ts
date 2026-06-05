@@ -262,19 +262,30 @@ class PeriscopeAccessProvider implements XAccessProvider {
   private opts(guestToken?: string): XApiOpts {
     return {
       xApiBase: this.cfg.apiBase,
+      guestApiBase: this.cfg.guestApiBase,
       pscpApiBase: this.cfg.pscpBase,
       bearer: this.cfg.bearer,
       guestToken,
     };
   }
 
+  /**
+   * Best-effort: mint + cache a shared guest token. The activate.json endpoint is
+   * deprecated/flaky, so a failure is non-fatal — we fall back to resolving with
+   * just the public bearer (works for many public broadcasts).
+   */
   private async ensureGuestToken(force = false): Promise<string> {
     if (this.cfg.guestToken) return this.cfg.guestToken; // manual override (env)
-    const fresh = this.guestToken && Date.now() - this.guestMintedAt < PeriscopeAccessProvider.GUEST_TTL_MS;
+    const fresh = this.guestToken !== undefined && Date.now() - this.guestMintedAt < PeriscopeAccessProvider.GUEST_TTL_MS;
     if (!force && fresh) return this.guestToken!;
-    this.guestToken = await getGuestToken(this.opts());
+    try {
+      this.guestToken = await getGuestToken(this.opts());
+      this.log.debug("minted shared x guest token");
+    } catch (err) {
+      this.log.warn(`x guest token unavailable (${(err as Error).message}); resolving bearer-only`);
+      this.guestToken = ""; // sentinel: tried, none available
+    }
     this.guestMintedAt = Date.now();
-    this.log.debug("minted shared x guest token");
     return this.guestToken;
   }
 
