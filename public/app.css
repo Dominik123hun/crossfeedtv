@@ -107,6 +107,19 @@
   flex-direction: column;
   gap: 16px;
 }
+.field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.field-link {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.field-link:hover {
+  color: var(--text);
+}
 .auth-foot {
   margin-top: 20px;
   text-align: center;

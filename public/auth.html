@@ -30,18 +30,23 @@
           <p id="authSubtitle">Connect your channels and get your overlay URL in seconds.</p>
         </div>
 
+        <div class="notice ok hidden" id="info" role="status"></div>
         <div class="notice error hidden" id="error" role="alert"></div>
 
         <form class="auth-form" id="authForm" novalidate>
-          <div class="field">
+          <div class="field" id="emailField">
             <label for="email">Email</label>
             <input class="input" type="email" id="email" name="email" autocomplete="email" required placeholder="you@example.com" />
           </div>
-          <div class="field">
-            <label for="password">Password</label>
+          <div class="field" id="passwordField">
+            <div class="field-head">
+              <label for="password">Password</label>
+              <a href="/forgot" data-mode="forgot" id="forgotLink" class="field-link hidden">Forgot password?</a>
+            </div>
             <input class="input" type="password" id="password" name="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters" />
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit" id="submitBtn">Create account</button>
+          <button class="btn btn-block hidden" type="button" id="secondaryBtn"></button>
         </form>
 
         <p class="auth-foot" id="switcher"></p>
