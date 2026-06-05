@@ -13,6 +13,7 @@ import {
   verifyPassword,
 } from "./auth";
 import { logger } from "./logger";
+import { RateLimiter } from "./rate-limit";
 
 const log = logger.child("api");
 const MAX_BODY = 64 * 1024;
@@ -28,7 +29,19 @@ export interface Api {
 }
 
 export function createApi(deps: ApiDeps): Api {
-  return { handle: (req, res, url) => route(req, res, url, deps) };
+  // Per-IP rate limit for auth endpoints (brute-force / signup-spam mitigation).
+  const authLimiter = new RateLimiter(deps.cfg.auth.rateMax, deps.cfg.auth.rateWindowMs);
+  const prune = setInterval(() => authLimiter.prune(), 10 * 60 * 1000);
+  prune.unref?.();
+  return { handle: (req, res, url) => route(req, res, url, deps, authLimiter) };
+}
+
+/** Best-effort client IP (honors the proxy's X-Forwarded-For first hop). */
+function clientIp(req: IncomingMessage): string {
+  const xff = req.headers["x-forwarded-for"];
+  const fwd = Array.isArray(xff) ? xff[0] : xff;
+  const first = (fwd ?? "").split(",")[0]?.trim();
+  return first || req.socket.remoteAddress || "unknown";
 }
 
 async function route(
@@ -36,6 +49,7 @@ async function route(
   res: ServerResponse,
   url: URL,
   deps: ApiDeps,
+  authLimiter: RateLimiter,
 ): Promise<void> {
   const { store, hub, cfg } = deps;
   const secure = isSecureRequest(req, cfg.cookieSecure);
@@ -47,6 +61,13 @@ async function route(
     // additionally require a header that a cross-site <form> post cannot set.
     if (method !== "GET" && !req.headers["x-requested-with"]) {
       return json(res, 403, { error: "Missing X-Requested-With header." });
+    }
+
+    // Rate-limit auth attempts per IP (brute force / signup spam).
+    if ((p === "/api/signup" || p === "/api/login") && method === "POST") {
+      if (!authLimiter.allow(clientIp(req))) {
+        return json(res, 429, { error: "Too many attempts. Please wait a bit and try again." });
+      }
     }
 
     if (p === "/api/signup" && method === "POST") {

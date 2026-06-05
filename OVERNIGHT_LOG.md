@@ -63,3 +63,23 @@
 - **Tests:** build green; `npm test` = **51 passing**.
 - **Review:** worth a glance — the two fixes are correct and covered by tests, but
   confirm the 413 `Connection: close` behavior is acceptable for your proxy.
+
+### Item 2 — Security hardening (additive)
+- **Audited** the existing posture (mostly already solid): tokens are 192-bit
+  CSPRNG (`randomBytes(24)`); rotation invalidates the old token server-side;
+  scrypt + timing-safe password compare; HttpOnly/SameSite=Lax/Secure cookies;
+  CSRF via required `X-Requested-With`; channel/settings validation; body-size
+  cap; output via `textContent` + http(s) emote-URL guard; per-user isolation;
+  `.gitignore` covers `.env` + `data/` and **no secrets/DB files are tracked**.
+- **Added (the one real gap): per-IP rate limiting on signup/login.** New
+  `src/rate-limit.ts` (in-memory sliding window, no deps), wired into `api.ts`
+  for `/api/signup` + `/api/login`, configurable via `AUTH_RATE_MAX` /
+  `AUTH_RATE_WINDOW_MS` (default 20 / 5 min). Honors `X-Forwarded-For`.
+- **Wrote `SECURITY.md`** documenting what's covered and a "Needs attention"
+  list (multi-instance shared store/sessions/limiter, email-verify/lockout,
+  HSTS/CSP at the proxy, Kick/X official APIs, billing/quotas).
+- **Files:** `src/rate-limit.ts`, `src/api.ts`, `src/config.ts`, `.env.example`,
+  `SECURITY.md`, `test/helpers.ts` (+`auth` cfg), `test/api.test.ts` (rate-limit test).
+- **Tests:** build green; `npm test` = **52 passing**.
+- **Review:** the rate limiter is per-process/in-memory — fine for one instance;
+  see SECURITY.md "Needs attention" for the multi-instance note.

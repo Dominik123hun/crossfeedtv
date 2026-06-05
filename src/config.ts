@@ -83,6 +83,8 @@ export interface AppConfig {
   sessionTtlMs: number;
   /** Force/disable the Secure cookie flag; if undefined, inferred per-request. */
   cookieSecure?: boolean;
+  /** Rate limiting for auth endpoints (signup/login), per client IP. */
+  auth: { rateMax: number; rateWindowMs: number };
 }
 
 /**
@@ -174,5 +176,9 @@ export function loadConfig(): AppConfig {
     sessionTtlMs: int(process.env.SESSION_TTL_MS, 30 * 24 * 60 * 60 * 1000),
     cookieSecure:
       process.env.COOKIE_SECURE === undefined ? undefined : bool(process.env.COOKIE_SECURE),
+    auth: {
+      rateMax: int(process.env.AUTH_RATE_MAX, 20),
+      rateWindowMs: int(process.env.AUTH_RATE_WINDOW_MS, 5 * 60 * 1000),
+    },
   };
 }

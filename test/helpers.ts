@@ -96,6 +96,9 @@ export interface TestServer {
 
 export interface TestServerOptions {
   sessionTtlMs?: number;
+  /** Auth rate-limit max attempts per IP (high by default so tests don't trip it). */
+  authRateMax?: number;
+  authRateWindowMs?: number;
 }
 
 export async function startServer(opts: TestServerOptions = {}): Promise<TestServer> {
@@ -113,6 +116,7 @@ export async function startServer(opts: TestServerOptions = {}): Promise<TestSer
     dataDir,
     sessionTtlMs: opts.sessionTtlMs ?? 30 * 24 * 60 * 60 * 1000,
     cookieSecure: false,
+    auth: { rateMax: opts.authRateMax ?? 100000, rateWindowMs: opts.authRateWindowMs ?? 60000 },
   };
   const bus = new FakeBus();
   const hub = new Hub(cfg, makeFakeFactories(bus));

@@ -148,6 +148,23 @@ test("test feed: 200 then debounced 429; requires auth", async () => {
   assert.equal((await httpReq(srv.base, "POST", "/api/test", { cookie })).status, 429, "debounced");
 });
 
+test("auth rate limiting: too many signup/login attempts -> 429", async () => {
+  const limited = await startServer({ authRateMax: 3, authRateWindowMs: 60000 });
+  try {
+    // 3 allowed, 4th blocked (validation failures still count as attempts).
+    for (let i = 0; i < 3; i++) {
+      const r = await httpReq(limited.base, "POST", "/api/login", { json: { email: email(), password: "x" } });
+      assert.equal(r.status, 401, `attempt ${i} should be processed (bad creds)`);
+    }
+    const blocked = await httpReq(limited.base, "POST", "/api/login", { json: { email: email(), password: "x" } });
+    assert.equal(blocked.status, 429, "4th attempt should be rate-limited");
+    // signup shares the same per-IP limiter
+    assert.equal((await httpReq(limited.base, "POST", "/api/signup", { json: { email: email(), password: "password123" } })).status, 429);
+  } finally {
+    await limited.close();
+  }
+});
+
 test("token rotate invalidates old token; delete removes account", async () => {
   const { cookie, user } = await signup();
   const old = user.token;
