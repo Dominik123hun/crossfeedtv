@@ -286,20 +286,22 @@ export class Hub {
     const ids = this.clientsByUser.get(userId);
     if (!ids || ids.size === 0) return;
 
-    const desired = new Set<string>();
+    // Map lowercased key -> ORIGINAL-case channel. Keys stay case-insensitive for
+    // routing/dedup, but the ingester must receive the exact channel the user gave
+    // (X broadcast ids are CASE-SENSITIVE — lowercasing them makes resolve 404).
+    const desired = new Map<string, { platform: Platform; channel: string }>();
     for (const platform of PLATFORMS) {
       const channel = channels[platform];
-      if (channel) desired.add(keyOf(platform, channel));
+      if (channel) desired.set(keyOf(platform, channel), { platform, channel });
     }
 
     for (const id of ids) {
       const client = this.clients.get(id);
       if (!client) continue;
 
-      for (const key of desired) {
+      for (const [key, { platform, channel }] of desired) {
         if (client.subs.has(key)) continue;
-        const [platform, channel] = splitKey(key);
-        this.ensure(platform, channel, false);
+        this.ensure(platform, channel, false); // original case, not splitKey(key)
         client.subs.add(key);
         this.sendStatusForKey(client.ws, key);
       }
@@ -313,7 +315,7 @@ export class Hub {
       }
       this.send(client.ws, { type: "hello", subscriptions: [...client.subs] });
     }
-    this.log.info(`resubscribed user ${userId.slice(0, 8)} -> [${[...desired].join(", ") || "none"}]`);
+    this.log.info(`resubscribed user ${userId.slice(0, 8)} -> [${[...desired.keys()].join(", ") || "none"}]`);
   }
 
   /** Push updated overlay settings to all of a user's live clients (no OBS refresh). */
