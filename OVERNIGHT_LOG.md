@@ -83,3 +83,18 @@
 - **Tests:** build green; `npm test` = **52 passing**.
 - **Review:** the rate limiter is per-process/in-memory — fine for one instance;
   see SECURITY.md "Needs attention" for the multi-instance note.
+
+### Item 3 — Resilience (verify + strengthen tests)
+- **Already well-covered**, so per the rules I verified rather than rebuilt:
+  per-ingester exponential backoff + jitter + connect-watchdog with full per-
+  ingester isolation (`BaseIngester`); emote-set load failures fail soft (shown
+  as text, message never dropped — `test/emotes.test.ts`); overlay bounds memory
+  with a 200-message DOM cap + a burst queue cap (`public/overlay.js`).
+- **Added `test/base-ingester.test.ts`** (the previously-untested core): connect→
+  connected, reconnect-after-drop with backoff, **stop() cancels pending
+  reconnect**, the **connect watchdog** tears down a hung connect, throwing
+  event handlers are **isolated** (never escape the ingester), and double-start /
+  stop-before-start are safe.
+- **Files:** `test/base-ingester.test.ts`. No production code changed.
+- **Tests:** build green; `npm test` = **56 passing**.
+- **Review:** none required.
