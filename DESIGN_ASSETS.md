@@ -12,16 +12,18 @@ yet**. The site ships with **premium CSS fallbacks** (gradients/grain) and
 progressively loads `/public/assets/*.webp` if present (see `landing.js`
 `loadArt()`), so it looks polished with or without the images.
 
-**To bundle the real images, run (on your machine, where the CDN is reachable):**
+**To bundle the real images, add them by hand** (your browser can reach the CDN
+even though the build sandbox can't): download each WebP from the "Download"
+column below and save it into `public/assets/` with the **exact** target
+filename, then:
 
 ```bash
-bash scripts/fetch-design-assets.sh    # downloads + optimizes into public/assets/
-git add public/assets && git commit -m "assets: bundle generated brand imagery"
+git add public/assets && git commit -m "assets: bundle generated brand imagery" && git push
 ```
 
-Requires ImageMagick (`brew install imagemagick` or `apt-get install imagemagick`).
-If a source URL has expired, regenerate it from the prompt below (Higgsfield) and
-update the URL in the script.
+Filenames are case-sensitive and must match exactly. The hero/scene `.webp` files
+are what the page loads; `icon.png` (favicon) and `og.webp` are optional. If a
+source URL has expired, regenerate it from the prompt below (Higgsfield).
 
 ## Assets
 
@@ -34,12 +36,19 @@ update the URL in the script.
 | `public/assets/og.webp` | Social share image — derived from the hero (1200×630 crop) | (from hero) | — |
 | section textures | Subtle section depth | **CSS-native** (gradients + grain) — no raster needed | — |
 
-### Source URLs (used by the fetch script)
+### Download (ready-to-save WebP → target filename)
 
-- hero: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_151045_d288c14c-c260-424b-8aa4-d4e47ae85810.png`
-- hero-mobile: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152552_a7c63cf3-1b76-47f5-85c7-66e6ee067414.png`
-- stream-scene: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152545_63a268f1-0036-4eb2-8a4a-0f7857339f1c.png`
-- glyph: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152536_8a03fdf0-79a0-432d-b347-52f0ed0d9035.jpeg`
+Save each into `public/assets/` with the name on the left:
+
+- `hero.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_151045_d288c14c-c260-424b-8aa4-d4e47ae85810_min.webp`
+- `hero-mobile.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152552_a7c63cf3-1b76-47f5-85c7-66e6ee067414_min.webp`
+- `stream-scene.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152545_63a268f1-0036-4eb2-8a4a-0f7857339f1c_min.webp`
+- `og.webp` → reuse the hero (copy `hero.webp` → `og.webp`), or download the hero WebP again under this name
+- `icon.png` (favicon, optional) → the glyph: `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_152536_8a03fdf0-79a0-432d-b347-52f0ed0d9035_min.webp` (save as PNG, or point the favicon at a `.webp` if you prefer)
+
+These `_min.webp` links are already web-optimized WebP, so no conversion tool is
+needed. (The full-resolution originals are the same URLs without the `_min.webp`
+suffix — `.png`/`.jpeg` — if you want to resize them yourself.)
 
 ## Prompts (to regenerate / swap)
 
@@ -61,5 +70,5 @@ room at night — soft defocused bokeh, dark teal+violet ambient light, faint ne
 green glow, near-black #0a0a0c, volumetric haze, no identifiable objects.
 Cinematic, calm, low-contrast. No text/people/characters/game content/logos."
 
-To swap any asset: regenerate in Higgsfield with an adjusted prompt, drop the new
-URL into `scripts/fetch-design-assets.sh`, and re-run it.
+To swap any asset: regenerate in Higgsfield with an adjusted prompt and replace the
+file in `public/assets/` (keep the same filename), then commit.
