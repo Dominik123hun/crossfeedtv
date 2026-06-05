@@ -323,15 +323,44 @@ http://localhost:8080/overlay.html?twitch=xqc&size=22&max=150&status=1
 
 ---
 
+## Testing
+
+```bash
+npm run build   # typecheck (tsc)
+npm test        # full test suite
+```
+
+Tests use **Node's built-in test runner** (`node:test`) run through `tsx` — no
+extra dependencies. They spin the real server up in-process on an ephemeral port
+with deterministic **fake ingesters**, so the suite never touches the live
+Twitch/Kick/X network and runs fast/offline.
+
+Coverage includes: the `Store` (CRUD, sessions, expiry, token-rotation
+invalidation, settings migration), auth (scrypt, cookies, secure detection),
+the emote resolver (precedence, fail-soft, merge), the chat parsers, the
+`BaseIngester` lifecycle (reconnect/backoff, connect watchdog, isolation), and
+end-to-end API + feed behavior (session gating, CSRF, rate limiting, per-user
+isolation, token→channel resolution, live re-subscription, settings push,
+per-source status, and the test-feed — isolated, debounced, never persisted).
+
+The "full suite" for development = `npm run build` + `npm test`.
+
+## Security
+
+See [`SECURITY.md`](./SECURITY.md) for what's covered (tokens, sessions, CSRF,
+rate limiting, input validation, output escaping, isolation, secret hygiene) and
+the "Needs attention" list before real/paying users.
+
 ## Configuration reference
 
 See [`.env.example`](./.env.example) for every key (server host/port, default
-channels, Twitch endpoint, reconnect backoff, log level).
+channels, Twitch endpoint, reconnect backoff, log level, session/cookie + auth
+rate-limit settings).
 
 ## Capturing unofficial values
 
 Kick and X rely on undocumented endpoints. See [`RECON.md`](./RECON.md) for how
-to capture the real values from Chrome DevTools (added with steps 2 and 3).
+to capture the real values from Chrome DevTools.
 
 ## License
 

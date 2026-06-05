@@ -140,3 +140,14 @@
 - **Files:** `public/theme.css`, `public/dashboard.html`.
 - **Tests:** build green; `npm test` = **57 passing** (static-only changes).
 - **Review:** none required; a visual once-over on a phone is nice-to-have.
+
+### Item 6 — Docs
+- **README:** added a **Testing** section (`npm test` via Node's built-in runner
+  through tsx, what's covered, "full suite" = build + test) and a **Security**
+  pointer to `SECURITY.md`; tweaked the config-reference blurb.
+- Existing code is already heavily commented; no non-obvious logic found lacking
+  comments, so none were padded. (RECON.md gets the official-Kick capture note in
+  item 7.)
+- **Files:** `README.md`.
+- **Tests:** unchanged; **57 passing**.
+- **Review:** none required.
