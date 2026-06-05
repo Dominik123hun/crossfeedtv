@@ -156,14 +156,19 @@
     els[k].addEventListener("change", scheduleSaveSettings);
   });
 
+  var previewToken = null;
   function renderPreview(user) {
-    // Always connect the preview (even with no channels) so the test button has
-    // a live client to render into — and so OBS-style status shows immediately.
+    // Build the preview ONCE per token. Channel + settings changes are pushed to
+    // the already-connected overlay live (hub.resubscribe / settings push), so we
+    // must NOT rebuild it on save — reloading drops the feed socket and would lose
+    // any in-flight test burst (the cause of an empty preview right after saving).
+    // It only rebuilds when the token changes (e.g. after "Reset link").
+    if (previewToken === user.token && els.preview.querySelector("iframe")) return;
+    previewToken = user.token;
     els.preview.innerHTML = "";
     var iframe = document.createElement("iframe");
     iframe.title = "Live overlay preview";
-    // cache-bust so saving channels/settings refreshes the preview
-    iframe.src = user.overlayPath + "&status=1&size=15&_=" + Date.now();
+    iframe.src = user.overlayPath + "&status=1&size=15";
     els.preview.appendChild(iframe);
   }
 
