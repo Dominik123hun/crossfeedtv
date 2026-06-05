@@ -6,8 +6,7 @@
 .topbar {
   height: var(--nav-h);
   border-bottom: 1px solid var(--line-soft);
-  background: rgba(11, 13, 17, 0.72);
-  backdrop-filter: saturate(140%) blur(12px);
+  background: var(--bg);
   position: sticky;
   top: 0;
   z-index: 40;
@@ -364,9 +363,7 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background:
-    radial-gradient(60% 80% at 70% 20%, rgba(124, 92, 255, 0.16), transparent 60%),
-    linear-gradient(135deg, #15182230, #0b0d11);
+  background: var(--bg);
 }
 .preview iframe {
   display: block;
@@ -411,32 +408,32 @@
   }
 }
 
-/* ── Redesign polish (cohesive with the landing visual language) ── */
+/* ── Contract polish (quiet shell; cohesive with the landing) ── */
 .auth-wrap {
   position: relative;
   isolation: isolate;
 }
+/* Quiet: one barely-there neutral top light, no color glow. */
 .auth-wrap::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(48% 46% at 50% 6%, rgba(124, 92, 255, 0.16), transparent 60%),
-    radial-gradient(42% 42% at 88% 102%, rgba(83, 252, 24, 0.05), transparent 60%);
+  background: radial-gradient(40rem 22rem at 50% -12%, rgba(255, 255, 255, 0.02), transparent 60%);
 }
 .auth-card {
-  box-shadow:
-    var(--shadow),
-    0 0 0 1px rgba(124, 92, 255, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow);
 }
 .panel-title,
 .page-title {
-  font-family: var(--font-display);
   letter-spacing: -0.015em;
 }
-.preview {
-  box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.06);
+/* Console motif: identifiers + live status read as mono. */
+.topbar .who .email,
+.status-row .state {
+  font-family: var(--mono);
+}
+.status-row .state {
+  font-size: 13px;
 }

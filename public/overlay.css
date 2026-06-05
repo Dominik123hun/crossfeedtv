@@ -8,6 +8,9 @@
   --font-size: 18px;
   --font-family: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial,
     sans-serif;
+  /* Console motif — system monospace stack (no web font, works offline in OBS). */
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
 
   --twitch: #9146ff;
   --kick: #53fc18;
@@ -83,17 +86,18 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.32em;
-  font-size: 0.66em;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-family: var(--mono);
+  font-size: 0.64em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  padding: 0.2em 0.6em;
-  border-radius: 999px;
+  padding: 0.18em 0.5em;
+  border-radius: 5px;
   color: #fff;
   text-shadow: none;
   transform: translateY(-0.08em);
-  /* Subtle premium sheen; no glow so it stays legible over any video. */
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  /* Subtle sheen; no glow so it stays legible over any video. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 .pill.twitch {
   background: var(--twitch);
@@ -153,8 +157,9 @@ body {
 
 /* ── Author + text ── */
 .author {
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-family: var(--mono);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 .colon {
   margin-left: -0.2em;
