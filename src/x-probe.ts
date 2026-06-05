@@ -36,15 +36,28 @@ async function main(): Promise<void> {
   const x = loadConfig().x;
   const opts: XApiOpts = {
     xApiBase: x.apiBase,
+    guestApiBase: x.guestApiBase,
     pscpApiBase: x.pscpBase,
     bearer: x.bearer,
     guestToken: x.guestToken,
+    authToken: x.authTokenCookie,
+    csrf: x.csrfToken,
   };
+  const authed = !!(x.authTokenCookie && x.csrfToken);
+  console.log(`auth mode: ${authed ? "logged-in (X_AUTH_TOKEN/X_CSRF)" : "anonymous (guest/bearer)"}`);
 
   console.log(`broadcast id: ${id}`);
   try {
-    const guest = opts.guestToken ?? (await getGuestToken(opts));
-    console.log(`✓ guest token        ${short(guest)}`);
+    let guest = opts.guestToken ?? "";
+    if (!authed && !guest) {
+      // Anonymous: try the (deprecated, best-effort) guest token.
+      try {
+        guest = await getGuestToken(opts);
+        console.log(`✓ guest token        ${short(guest)}`);
+      } catch (e) {
+        console.log(`· guest token        unavailable (${(e as Error).message}) — bearer-only`);
+      }
+    }
     const { chatToken } = await resolveBroadcast(id, { ...opts, guestToken: guest });
     console.log(`✓ chat_token         ${short(chatToken)}`);
     const { endpoint, accessToken } = await getChatAccess(chatToken, opts);

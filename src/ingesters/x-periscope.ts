@@ -43,10 +43,14 @@ export interface XApiOpts {
   guestApiBase?: string;
   /** Periscope base for accessChatPublic. */
   pscpApiBase?: string;
-  /** Web bearer for guest auth (override X_BEARER). */
+  /** Web bearer (override X_BEARER). */
   bearer?: string;
   /** A pre-minted guest token (skips activate.json when provided). */
   guestToken?: string;
+  /** Logged-in session: the `auth_token` cookie (X_AUTH_TOKEN). */
+  authToken?: string;
+  /** Logged-in session: the `ct0` CSRF cookie (X_CSRF). */
+  csrf?: string;
   /** Injectable fetch (tests pass a fake; defaults to global fetch). */
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
@@ -119,9 +123,19 @@ export async function resolveBroadcast(broadcastId: string, opts: XApiOpts = {})
   const url = `${base}/broadcasts/show.json?ids=${encodeURIComponent(broadcastId)}&include_events=true`;
   const f = opts.fetchImpl ?? fetch;
   const headers: Record<string, string> = { authorization: bearer, accept: "application/json" };
-  if (opts.guestToken) headers["x-guest-token"] = opts.guestToken;
+  if (opts.authToken && opts.csrf) {
+    // Logged-in session: bearer + CSRF + cookies authenticate as the operator's
+    // account (one shared login resolves every public broadcast).
+    headers["x-csrf-token"] = opts.csrf;
+    headers["cookie"] = `auth_token=${opts.authToken}; ct0=${opts.csrf}`;
+  } else if (opts.guestToken) {
+    headers["x-guest-token"] = opts.guestToken;
+  }
   const res = await f(url, { headers, signal: opts.signal });
-  if (!res.ok) throw new Error(`broadcasts/show HTTP ${res.status} (offline/not public? see RECON.md)`);
+  if (!res.ok) {
+    const hint = opts.authToken ? "auth expired/invalid?" : "needs login — set X_AUTH_TOKEN/X_CSRF";
+    throw new Error(`broadcasts/show HTTP ${res.status} (${hint} — see RECON.md)`);
+  }
   const json = (await res.json()) as Record<string, unknown>;
   const chatToken = extractChatToken(json, broadcastId);
   if (!chatToken) throw new Error("broadcasts/show: no chat_token found (confirm the field — see RECON.md)");

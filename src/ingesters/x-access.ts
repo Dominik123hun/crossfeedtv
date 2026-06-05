@@ -259,6 +259,11 @@ class PeriscopeAccessProvider implements XAccessProvider {
     private readonly log: Logger,
   ) {}
 
+  /** True once a logged-in session is configured (cookies) — guest token then unneeded. */
+  private get authed(): boolean {
+    return !!(this.cfg.authTokenCookie && this.cfg.csrfToken);
+  }
+
   private opts(guestToken?: string): XApiOpts {
     return {
       xApiBase: this.cfg.apiBase,
@@ -266,6 +271,8 @@ class PeriscopeAccessProvider implements XAccessProvider {
       pscpApiBase: this.cfg.pscpBase,
       bearer: this.cfg.bearer,
       guestToken,
+      authToken: this.cfg.authTokenCookie,
+      csrf: this.cfg.csrfToken,
     };
   }
 
@@ -303,7 +310,8 @@ class PeriscopeAccessProvider implements XAccessProvider {
   }
 
   private async attempt(broadcastId: string, forceGuest: boolean): Promise<XAccess> {
-    const guestToken = await this.ensureGuestToken(forceGuest);
+    // A logged-in session authenticates directly — no (dead) guest token needed.
+    const guestToken = this.authed ? "" : await this.ensureGuestToken(forceGuest);
     const { chatToken } = await resolveBroadcast(broadcastId, this.opts(guestToken));
     const { endpoint, accessToken } = await getChatAccess(chatToken, this.opts());
     this.log.debug(`periscope access ok for ${broadcastId}`);
@@ -338,8 +346,8 @@ function resolveMode(cfg: XConfig): XMode {
   if (cfg.mode !== "auto") return cfg.mode;
   if (cfg.chatWsUrl && cfg.accessToken) return "static";
   if (cfg.accessUrl) return "http";
-  if (cfg.authTokenCookie && cfg.csrfToken) return "browser";
-  // Default: the real public Periscope handshake (no creds needed for public broadcasts).
+  // Default: the modern resolver. It uses the logged-in cookies (X_AUTH_TOKEN/
+  // X_CSRF) when present; Puppeteer "browser" mode is opt-in via X_MODE=browser.
   return "periscope";
 }
 

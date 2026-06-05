@@ -136,6 +136,24 @@ A user enters a **broadcast id** or pastes the `x.com/i/broadcasts/<id>` URL
 (the id is parsed out). For a quick single-broadcast smoke test you can also set
 `X_BROADCAST_ID` and run with `X_ENABLED=true`.
 
+### Authentication — the guest path is dead; use a logged-in session
+
+X **deprecated the anonymous guest-token endpoint** (`guest/activate.json` now
+404s), and `broadcasts/show.json` then returns 404 without auth. The working path
+is **one shared logged-in session** (your account) — it resolves *every* user's
+public broadcast, so it still scales. Capture two cookies from a logged-in
+`x.com` tab (DevTools → **Application → Cookies → https://x.com**):
+
+| Cookie       | Env var        |
+| ------------ | -------------- |
+| `auth_token` | `X_AUTH_TOKEN` |
+| `ct0`        | `X_CSRF`       |
+
+Set both (keep `X_MODE=auto`) and the resolver authenticates as your account.
+Treat `auth_token` like a password — it's a full session token; it expires
+(re-capture when resolution starts 401ing), and automating a logged-in session is
+against X's ToS, so this stays a **beta/at-your-own-risk** capability.
+
 ### If it breaks — verify each step in DevTools
 
 Run `npm run x:probe -- <id>` first; it tells you which step fails. Then:
@@ -172,6 +190,8 @@ Run `npm run x:probe -- <id>` first; it tells you which step fails. Then:
 | `X_API_BASE`       | x.com API base for resolve (default `https://api.x.com/1.1`).     |
 | `X_GUEST_API_BASE` | Guest-token host (default `https://api.twitter.com/1.1`).         |
 | `X_PSCP_BASE`      | Periscope chat base (default `https://proxsee.pscp.tv/api/v2`).   |
+| `X_AUTH_TOKEN`     | **Logged-in `auth_token` cookie** — needed now that guest auth is dead. |
+| `X_CSRF`           | **Logged-in `ct0` cookie** (also sent as `x-csrf-token`).         |
 | `X_BEARER`         | Override the public web bearer if guest auth 401s.                |
 | `X_GUEST_TOKEN`    | Pre-minted guest token (skips `activate.json`).                   |
 | `X_BROADCAST_ID`   | A broadcast id to connect on startup (or use the dashboard).      |

@@ -131,6 +131,28 @@ test("resolveBroadcast hits broadcasts/show.json with the id, forwarding a guest
   assert.equal(seenGuest, undefined);
 });
 
+test("resolveBroadcast sends auth cookies + csrf when a logged-in session is configured", async () => {
+  let cookie: string | undefined;
+  let csrf: string | undefined;
+  let guest: string | undefined;
+  const spy = (async (_url: string, init?: { headers?: Record<string, string> }) => {
+    cookie = init?.headers?.["cookie"];
+    csrf = init?.headers?.["x-csrf-token"];
+    guest = init?.headers?.["x-guest-token"];
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ broadcasts: { BID: { chat_token: "CT" } } }),
+      text: async () => "",
+    };
+  }) as unknown as typeof fetch;
+
+  await resolveBroadcast("BID", { fetchImpl: spy, authToken: "AUTH", csrf: "CT0", guestToken: "G1" });
+  assert.equal(cookie, "auth_token=AUTH; ct0=CT0");
+  assert.equal(csrf, "CT0");
+  assert.equal(guest, undefined, "logged-in session shouldn't also send a guest token");
+});
+
 // ── WS URL + frames ───────────────────────────────────────────────────────────
 test("chatWsUrl appends the live chat path and upgrades to wss", () => {
   assert.equal(chatWsUrl("https://chat.pscp.tv"), "wss://chat.pscp.tv/chatapi/v1/chatnow");
