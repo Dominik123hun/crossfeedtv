@@ -52,6 +52,8 @@ const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
   ".ico": "image/x-icon",
   ".txt": "text/plain; charset=utf-8",
   ".webmanifest": "application/manifest+json",
@@ -176,7 +178,7 @@ export function createServer(
     }
 
     const pathname = PAGES[url.pathname] ?? decodeURIComponent(url.pathname);
-    serveStatic(resolvedRoot, pathname, res, wantsHtml(req));
+    serveStatic(resolvedRoot, pathname, res, wantsHtml(req), req.headers.range);
   }
 
   const wss = new WebSocketServer({ noServer: true });
@@ -273,7 +275,13 @@ function readRawBody(req: http.IncomingMessage, cb: (raw: string) => void): void
   req.on("error", () => cb(""));
 }
 
-function serveStatic(root: string, pathname: string, res: http.ServerResponse, asHtml: boolean): void {
+function serveStatic(
+  root: string,
+  pathname: string,
+  res: http.ServerResponse,
+  asHtml: boolean,
+  range?: string,
+): void {
   // Prevent path traversal: normalize then ensure the result stays under root.
   const safe = path.normalize(pathname).replace(/^(\.\.[/\\])+/, "");
   const filePath = path.join(root, safe);
@@ -288,9 +296,35 @@ function serveStatic(root: string, pathname: string, res: http.ServerResponse, a
       serveErrorPage(root, res, 404, asHtml);
       return;
     }
-    const ext = path.extname(filePath).toLowerCase();
+    const type = CONTENT_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
+    const total = stat.size;
+
+    // HTTP Range — required for <video> seeking and iOS/Safari autoplay.
+    const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+    if (m) {
+      let start = m[1] ? parseInt(m[1], 10) : 0;
+      let end = m[2] ? parseInt(m[2], 10) : total - 1;
+      if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= total) {
+        res.writeHead(416, { "content-range": `bytes */${total}` });
+        res.end();
+        return;
+      }
+      if (end >= total) end = total - 1;
+      res.writeHead(206, {
+        "content-type": type,
+        "content-range": `bytes ${start}-${end}/${total}`,
+        "accept-ranges": "bytes",
+        "content-length": String(end - start + 1),
+        "cache-control": "no-cache",
+      });
+      fs.createReadStream(filePath, { start, end }).on("error", () => res.end()).pipe(res);
+      return;
+    }
+
     res.writeHead(200, {
-      "content-type": CONTENT_TYPES[ext] || "application/octet-stream",
+      "content-type": type,
+      "content-length": String(total),
+      "accept-ranges": "bytes",
       "cache-control": "no-cache",
     });
     fs.createReadStream(filePath)
