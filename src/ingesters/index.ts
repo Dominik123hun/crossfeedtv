@@ -9,6 +9,7 @@ import { TwitchIngester } from "./twitch";
 import { PooledTwitchIngester, TwitchPool } from "./twitch-pool";
 import { createXAccessProvider, XAccessManager } from "./x-access";
 import { XIngester } from "./x";
+import { closeSharedXBrowser, XBrowserIngester } from "./x-browser";
 
 // Shared Twitch 3rd-party emote resolver (7TV/BTTV/FFZ), cached per channel.
 const twitchEmotes = new TwitchEmoteResolver({ log: logger.child("emotes") });
@@ -75,6 +76,7 @@ export function closeSharedResources(): void {
   twitchPool = undefined;
   xAccess?.close();
   xAccess = undefined;
+  closeSharedXBrowser();
 }
 
 export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
@@ -84,8 +86,11 @@ export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
       : new TwitchIngester(channel, cfg.reconnect, log, events, cfg.twitch.wsUrl, twitchEmotes),
   kick: (channel, cfg, log, events) => new KickIngester(channel, cfg, log, events),
   // X is BETA + unofficial — only connects when X_ENABLED=true; otherwise inert.
-  x: (channel, cfg, log, events) =>
-    cfg.x.enabled
-      ? new XIngester(channel, cfg, log, events, getXAccess(cfg))
-      : new DisabledIngester("x", channel),
+  // X_MODE=browser drives a real headless browser (most robust); else the
+  // fetch-based Periscope resolver.
+  x: (channel, cfg, log, events) => {
+    if (!cfg.x.enabled) return new DisabledIngester("x", channel);
+    if (cfg.x.mode === "browser") return new XBrowserIngester(channel, cfg, log, events);
+    return new XIngester(channel, cfg, log, events, getXAccess(cfg));
+  },
 };

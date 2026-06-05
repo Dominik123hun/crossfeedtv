@@ -11,6 +11,7 @@ import {
 } from "../src/ingesters/x-periscope";
 import { normalizeXMessage, sanitizeText } from "../src/ingesters/x-normalize";
 import { XIngester } from "../src/ingesters/x";
+import { XBrowserIngester } from "../src/ingesters/x-browser";
 import { XAccessManager, type XAccessProvider } from "../src/ingesters/x-access";
 import type { AppConfig } from "../src/config";
 import { logger, setLogLevel } from "../src/logger";
@@ -268,5 +269,32 @@ test("XIngester reports error then reconnects when the handshake fails (no crash
 
   assert.ok(states.includes("error"), `expected an error state, got ${states.join(",")}`);
   assert.ok(states.includes("reconnecting"), "should schedule a backed-off retry");
+  assert.equal(states[states.length - 1], "stopped", "stop() cleans up");
+});
+
+// ── Browser mode (X_MODE=browser): must fail-soft when Chromium/puppeteer absent ─
+test("XBrowserIngester degrades gracefully without a browser (error + retry, no crash)", async () => {
+  const states: IngesterState[] = [];
+  const cfg = {
+    reconnect: { initialMs: 20, maxMs: 40, factor: 2, jitter: 0, connectTimeoutMs: 3000 },
+    x: { browserHeadless: true },
+  } as unknown as AppConfig;
+
+  const ing = new XBrowserIngester(
+    "https://x.com/i/broadcasts/1ABCdef12345",
+    cfg,
+    logger.child("test:xb"),
+    { onState: (s) => states.push(s) },
+  );
+
+  ing.start();
+  // Launch fails fast (no Chromium in CI); give it a moment to surface + back off.
+  await new Promise((r) => setTimeout(r, 1500));
+  ing.stop();
+
+  assert.ok(
+    states.includes("error") || states.includes("reconnecting"),
+    `expected error/reconnecting, got ${states.join(",")}`,
+  );
   assert.equal(states[states.length - 1], "stopped", "stop() cleans up");
 });

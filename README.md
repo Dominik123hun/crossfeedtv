@@ -33,8 +33,12 @@ API, so it replicates the web player's **guest-token → Periscope** handshake
 `connectChat`, see [`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts))
 — behind the `X_ENABLED` flag, through a shared access manager that caches one
 guest token + per-broadcast access (scales to many chats). Probe one broadcast
-with `npm run x:probe -- <id>`. Unofficial and may break; anything unverified is a `TODO(recon)` constant
-documented in [`RECON.md`](./RECON.md). Plus emote/pill/perf/reconnect polish.
+with `npm run x:probe -- <id>`. If X blocks the fetch path (datacenter IPs often
+get a 404), `X_MODE=browser` drives a real headless Chromium and reads the chat
+WebSocket frames directly (`npm i puppeteer`; best run on a residential IP) —
+see [`src/ingesters/x-browser.ts`](./src/ingesters/x-browser.ts). Unofficial and
+may break; anything unverified is a `TODO(recon)` constant documented in
+[`RECON.md`](./RECON.md). Plus emote/pill/perf/reconnect polish.
 
 > **X is beta/unofficial.** It is never presented as a guaranteed source; enable
 > with `X_ENABLED=true`. The proper fix (an official API) remains a TODO, like

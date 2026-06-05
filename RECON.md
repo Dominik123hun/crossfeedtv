@@ -159,6 +159,24 @@ That one login resolves every user's gated broadcast (still scales). Treat
 when it starts 401ing), and automating a logged-in session is against X's ToS, so
 it stays **beta/at-your-own-risk**. For a public broadcast you won't need it.
 
+### Browser mode (`X_MODE=browser`) — when the fetch path is blocked
+
+X fingerprints and blocks raw API requests (often a 404), especially from
+datacenter IPs. `X_MODE=browser` sidesteps that by driving a **real headless
+Chromium**: it loads `x.com/i/broadcasts/<id>`, lets X's own JS do the whole
+handshake, and reads the chat **WebSocket frames** off the wire via CDP
+(`Network.webSocketFrameReceived`) — reusing the same `normalizeXMessage`.
+
+- `npm i puppeteer` (downloads Chromium). One shared browser serves all X chats.
+- **Run it where X isn't blocking your IP** — your machine, a home box, or a
+  residential VPS. From Railway's datacenter IP it may still be blocked (and the
+  image needs Chromium: `apk add chromium` + `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`).
+  This is the natural home for the "split relay" idea — run the browser ingester
+  on a residential box pointed at the same data store.
+- Public broadcasts need no login; set `X_AUTH_TOKEN`/`X_CSRF` only for gated ones.
+- If puppeteer/Chromium is missing it fails soft (status `error`, backs off) and
+  never affects Twitch/Kick.
+
 ### If it breaks — verify each step in DevTools
 
 Run `npm run x:probe -- <id>` first; it tells you which step fails. Then:
