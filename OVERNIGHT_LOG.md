@@ -40,3 +40,26 @@
   `test/emotes.test.ts`, `test/parsers.test.ts`.
 - **Tests:** `npm run build` green; `npm test` = 29 passing.
 - **Review:** none required.
+
+### Item 1b — Integration tests + 2 robustness fixes they surfaced
+- **What:** Added `test/api.test.ts` and `test/feed.test.ts` covering the
+  security-critical paths end-to-end (in-process server + fake ingesters):
+  pages served; signup/login validation; session gating; **garbage/expired
+  cookies**; CSRF on every state-changing endpoint; malformed/oversized bodies;
+  channel sanitization; settings clamping; test-feed debounce; token-rotation +
+  account-delete invalidation; token→channel resolution; per-user isolation;
+  invalid/empty token → empty feed; per-platform status (idle/connected);
+  live re-subscription; settings frame on connect + live push; **real chat
+  routing isolation**; **test-message isolation + test:true flag** (never leaks
+  across users; never persisted — they bypass the Store entirely).
+- **Two real bugs caught & fixed (additive, low-risk):**
+  1. `src/auth.ts` `parseCookies` threw on malformed percent-encoding (e.g.
+     `cf_sess=%%%`) → surfaced as **HTTP 500**. Now caught → falls back to raw
+     value → request is simply unauthenticated (**401**).
+  2. `src/api.ts` `readJson` called `req.destroy()` on oversized bodies → client
+     got a **socket reset** instead of **413**. Now it stops buffering, lets the
+     stream drain, and returns a clean `413` with `Connection: close`.
+- **Files:** `test/api.test.ts`, `test/feed.test.ts`, `src/auth.ts`, `src/api.ts`.
+- **Tests:** build green; `npm test` = **51 passing**.
+- **Review:** worth a glance — the two fixes are correct and covered by tests, but
+  confirm the 413 `Connection: close` behavior is acceptable for your proxy.

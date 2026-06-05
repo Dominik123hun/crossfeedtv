@@ -31,7 +31,13 @@ export function parseCookies(req: IncomingMessage): Record<string, string> {
     if (i < 0) continue;
     const key = part.slice(0, i).trim();
     const value = part.slice(i + 1).trim();
-    if (key) out[key] = decodeURIComponent(value);
+    if (!key) continue;
+    // Malformed percent-encoding must not throw (would otherwise surface as a 500).
+    try {
+      out[key] = decodeURIComponent(value);
+    } catch {
+      out[key] = value;
+    }
   }
   return out;
 }

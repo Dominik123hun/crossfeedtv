@@ -143,7 +143,14 @@ async function route(
     return json(res, 404, { error: "Not found." });
   } catch (err) {
     if (err instanceof Error && err.message === "body too large") {
-      return json(res, 413, { error: "Request too large." });
+      // Close the connection: the (rejected) request body may still be draining.
+      res.writeHead(413, {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        connection: "close",
+      });
+      res.end('{"error":"Request too large."}');
+      return;
     }
     if (err instanceof Error && err.message === "invalid json") {
       return json(res, 400, { error: "Invalid JSON." });
@@ -210,16 +217,19 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let data = "";
     let size = 0;
+    let over = false;
     req.on("data", (chunk: Buffer) => {
+      if (over) return; // stop buffering, but let the stream drain so we can still respond
       size += chunk.length;
       if (size > MAX_BODY) {
+        over = true;
         reject(new Error("body too large"));
-        req.destroy();
         return;
       }
       data += chunk;
     });
     req.on("end", () => {
+      if (over) return;
       if (!data) return resolve({});
       try {
         resolve(JSON.parse(data));
