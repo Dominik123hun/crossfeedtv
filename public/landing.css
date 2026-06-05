@@ -2,14 +2,13 @@
    Crossfeed landing page. Builds on theme.css tokens.
    ───────────────────────────────────────────────────────────────────────── */
 
-/* ── Nav ── */
+/* ── Nav (solid, crisp — no glass/blur) ── */
 .nav {
   position: sticky;
   top: 0;
   z-index: 50;
   height: var(--nav-h);
-  background: rgba(11, 13, 17, 0.72);
-  backdrop-filter: saturate(140%) blur(12px);
+  background: var(--bg);
   border-bottom: 1px solid var(--line-soft);
 }
 .nav-inner {
@@ -50,34 +49,29 @@
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  /* Premium fallback: three colored light pools converging toward the feed (right). */
-  background:
-    radial-gradient(58% 92% at 86% 40%, rgba(124, 92, 255, 0.32), transparent 60%),
-    radial-gradient(40% 66% at 72% 76%, rgba(83, 252, 24, 0.12), transparent 62%),
-    radial-gradient(46% 80% at 102% 26%, rgba(255, 255, 255, 0.1), transparent 58%);
+  /* Quiet fallback: a single faint violet whisper behind the feed; near-black elsewhere. */
+  background: radial-gradient(46% 78% at 90% 42%, rgba(145, 70, 255, 0.06), transparent 60%);
 }
-/* The generated hero image, layered on top when present (wired by landing.js). */
+/* The generated DARK backdrop image, kept subtle so the live feed stays the star. */
 .hero-bg::after {
   content: "";
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 0.9s ease;
+  transition: opacity 0.8s ease;
   background: var(--hero-img, none) right center / cover no-repeat;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 34%);
-  mask-image: linear-gradient(90deg, transparent, #000 34%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%);
+  mask-image: linear-gradient(90deg, transparent, #000 40%);
 }
 .hero-bg.has-image::after {
-  opacity: 0.92;
+  opacity: 0.8;
 }
-/* Vignette so headline text stays crisp over either fallback or image. */
+/* Keep the left dark so headline text stays crisp. */
 .hero-bg::before {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(90deg, var(--bg) 8%, transparent 58%),
-    radial-gradient(120% 130% at 50% -10%, transparent 50%, rgba(0, 0, 0, 0.5));
+  background: linear-gradient(90deg, var(--bg) 6%, transparent 52%);
 }
 .hero-grid {
   display: grid;
@@ -94,10 +88,7 @@
   line-height: 0.98;
 }
 .hero-title .accent {
-  background: linear-gradient(120deg, var(--accent-hi), #c4b5ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--accent-hi);
 }
 .hero-sub {
   margin-top: 20px;
@@ -128,11 +119,13 @@
 }
 .hero-trust li::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--kick);
-  box-shadow: 0 0 8px rgba(83, 252, 24, 0.7);
+}
+.hero-trust li {
+  font-family: var(--mono);
 }
 
 /* ── The overlay frame (used in hero + OBS section) ── */
@@ -140,13 +133,8 @@
   position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background:
-    radial-gradient(120% 120% at 50% 0%, rgba(124, 92, 255, 0.1), transparent 55%),
-    linear-gradient(180deg, #0d0d13, #0a0a0c);
-  box-shadow:
-    var(--shadow),
-    0 0 0 1px rgba(124, 92, 255, 0.08),
-    0 30px 80px -30px var(--accent-glow);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 .overlay-frame-bar {
@@ -180,9 +168,10 @@
 }
 .live-tag {
   margin-left: auto;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   color: #ff5d5d;
   display: inline-flex;
   align-items: center;
@@ -190,11 +179,10 @@
 }
 .live-tag::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #ff3b3b;
-  box-shadow: 0 0 8px #ff3b3b;
   animation: livepulse 1.6s ease-in-out infinite;
 }
 @keyframes livepulse {
@@ -234,10 +222,12 @@
   }
 }
 .msg .author {
-  font-weight: 800;
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 0.92em;
 }
 .msg .colon {
-  opacity: 0.55;
+  opacity: 0.5;
   margin-left: -3px;
 }
 .msg .text {
@@ -245,11 +235,12 @@
   word-break: break-word;
 }
 .msg .badge {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 2px 5px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.16);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
 }
 .msg .emote {
   height: 22px;
@@ -270,7 +261,7 @@
   padding: clamp(64px, 9vw, 120px) 0;
 }
 .section-alt {
-  background: linear-gradient(180deg, transparent, rgba(124, 92, 255, 0.03), transparent);
+  background: var(--bg-1);
   border-block: 1px solid var(--line-soft);
 }
 .section-title {
@@ -297,15 +288,14 @@
 }
 .feature {
   position: relative;
-  padding: 30px 28px;
+  padding: 28px 26px;
   border-radius: var(--radius);
   border: 1px solid var(--line);
-  background: linear-gradient(180deg, #131319, var(--bg-1));
+  background: var(--bg-1);
   overflow: hidden;
   transition:
     transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    border-color 0.18s ease;
 }
 /* Platform-tinted accent line that lights up on hover. */
 .feature::before {
@@ -326,17 +316,16 @@
   background: linear-gradient(90deg, #fff, transparent 70%);
 }
 .feature:hover {
-  transform: translateY(-4px);
-  border-color: #34343f;
-  box-shadow: var(--shadow-soft);
+  transform: translateY(-3px);
+  border-color: #313139;
 }
 .feature:hover::before {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 .feature .ficon {
-  width: 48px;
-  height: 48px;
-  border-radius: 13px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   margin-bottom: 18px;
@@ -344,17 +333,18 @@
   background: var(--bg-2);
 }
 .feature .ficon svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
+/* Signal hairline only (no glow). */
 .feature.tw .ficon {
-  box-shadow: inset 0 0 0 1px rgba(145, 70, 255, 0.45), 0 0 24px -6px rgba(145, 70, 255, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(145, 70, 255, 0.45);
 }
 .feature.kk .ficon {
-  box-shadow: inset 0 0 0 1px rgba(83, 252, 24, 0.4), 0 0 24px -6px rgba(83, 252, 24, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(83, 252, 24, 0.4);
 }
 .feature.xx .ficon {
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), 0 0 24px -8px rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 .feature h3 {
   font-size: 20px;
@@ -384,21 +374,19 @@
   counter-increment: step;
 }
 .steps li::before {
-  content: counter(step);
+  content: "0" counter(step);
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   margin-bottom: 18px;
-  border-radius: 12px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-  color: #fff;
-  background: linear-gradient(180deg, var(--accent-hi), var(--accent));
-  box-shadow:
-    0 10px 26px -8px var(--accent-glow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--accent-hi);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
 }
 .steps h3 {
   font-size: 17px;
@@ -433,16 +421,15 @@
 .stream-scene {
   position: absolute;
   inset: 0;
+  /* Quiet near-black fallback with a single faint violet whisper. */
   background:
-    radial-gradient(60% 70% at 70% 30%, rgba(124, 92, 255, 0.22), transparent 60%),
-    radial-gradient(50% 60% at 20% 80%, rgba(83, 252, 24, 0.12), transparent 60%),
-    linear-gradient(135deg, #15182250, #0a0a0c), #0a0a0c;
+    radial-gradient(50% 60% at 75% 35%, rgba(145, 70, 255, 0.07), transparent 60%),
+    var(--bg);
 }
-/* When the generated atmospheric scene is fetched, layer it under tinting glows. */
+/* When the generated atmospheric scene is fetched, show it under a neutral scrim. */
 .stream-scene.has-image {
   background-image:
-    radial-gradient(60% 70% at 70% 30%, rgba(124, 92, 255, 0.18), transparent 60%),
-    radial-gradient(50% 60% at 20% 80%, rgba(83, 252, 24, 0.1), transparent 60%),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.1)),
     var(--scene-img);
   background-size: cover;
   background-position: center;
@@ -479,9 +466,8 @@
   top: 5%;
   right: 4%;
   width: min(38%, 360px);
-  background: rgba(8, 10, 13, 0.34);
+  background: rgba(9, 9, 12, 0.66);
   border-color: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(2px);
 }
 .overlay-frame.floating .feed {
   height: clamp(180px, 30vw, 320px);
@@ -535,13 +521,17 @@
   text-align: center;
   overflow: hidden;
 }
+/* A short signal hairline instead of a glow fill. */
 .cta-band::before {
   content: "";
   position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(60% 130% at 50% 132%, rgba(124, 92, 255, 0.22), transparent 62%);
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 .cta-inner {
   display: flex;
