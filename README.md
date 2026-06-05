@@ -28,11 +28,12 @@ get a unique overlay URL, and the functional overlay at `/overlay`.
 **Build status:** All steps complete. **Twitch** is fully wired (live), **Kick**
 is implemented (library-first with a built-in Pusher fallback), and **X** is an
 **experimental / beta** source (OFF by default): X has no official broadcast-chat
-API, so it replicates the public **Periscope (pscp.tv)** handshake the web player
-uses — `resolveBroadcast → getChatAccess → connectChat` (see
-[`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts)) — behind the
-`X_ENABLED` flag, through a shared token-minting access manager (scales to many
-chats). Unofficial and may break; anything unverified is a `TODO(recon)` constant
+API, so it replicates the web player's **guest-token → Periscope** handshake
+(`api.x.com/1.1` guest token + `broadcasts/show.json` → pscp.tv chat access →
+`connectChat`, see [`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts))
+— behind the `X_ENABLED` flag, through a shared access manager that caches one
+guest token + per-broadcast access (scales to many chats). Probe one broadcast
+with `npm run x:probe -- <id>`. Unofficial and may break; anything unverified is a `TODO(recon)` constant
 documented in [`RECON.md`](./RECON.md). Plus emote/pill/perf/reconnect polish.
 
 > **X is beta/unofficial.** It is never presented as a guaranteed source; enable

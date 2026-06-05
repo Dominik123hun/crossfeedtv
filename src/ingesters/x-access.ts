@@ -1,6 +1,13 @@
 import type { XConfig, XMode } from "../config";
 import type { Logger } from "../logger";
-import { chatWsUrl, getChatAccess, resolveBroadcast } from "./x-periscope";
+import {
+  chatWsUrl,
+  getChatAccess,
+  getGuestToken,
+  isAuthError,
+  resolveBroadcast,
+  type XApiOpts,
+} from "./x-periscope";
 
 /* ───────────────────────────────────────────────────────────────────────────
    X chat ACCESS layer — the scalable part of the design.
@@ -241,19 +248,57 @@ class BrowserAccessProvider implements XAccessProvider {
  */
 class PeriscopeAccessProvider implements XAccessProvider {
   readonly name = "periscope";
+  /** One guest token serves resolution for ALL broadcasts; minted once, refreshed lazily. */
+  private guestToken?: string;
+  private guestMintedAt = 0;
+  private static readonly GUEST_TTL_MS = 3 * 60 * 60 * 1000; // ~3h; refresh proactively
+
   constructor(
     private readonly cfg: XConfig,
     private readonly ttlMs: number,
     private readonly log: Logger,
   ) {}
 
+  private opts(guestToken?: string): XApiOpts {
+    return {
+      xApiBase: this.cfg.apiBase,
+      pscpApiBase: this.cfg.pscpBase,
+      bearer: this.cfg.bearer,
+      guestToken,
+    };
+  }
+
+  private async ensureGuestToken(force = false): Promise<string> {
+    if (this.cfg.guestToken) return this.cfg.guestToken; // manual override (env)
+    const fresh = this.guestToken && Date.now() - this.guestMintedAt < PeriscopeAccessProvider.GUEST_TTL_MS;
+    if (!force && fresh) return this.guestToken!;
+    this.guestToken = await getGuestToken(this.opts());
+    this.guestMintedAt = Date.now();
+    this.log.debug("minted shared x guest token");
+    return this.guestToken;
+  }
+
   async getAccess(broadcastId: string): Promise<XAccess> {
-    const opts = { apiBase: this.cfg.apiBase, guestToken: this.cfg.guestToken };
-    const { chatToken } = await resolveBroadcast(broadcastId, opts);
-    const { endpoint, accessToken } = await getChatAccess(chatToken, opts);
+    try {
+      return await this.attempt(broadcastId, false);
+    } catch (err) {
+      // A stale/expired guest token shows up as 401/403 — refresh once and retry.
+      if (isAuthError(err)) {
+        this.log.warn("x guest auth rejected — refreshing guest token and retrying");
+        return this.attempt(broadcastId, true);
+      }
+      throw err;
+    }
+  }
+
+  private async attempt(broadcastId: string, forceGuest: boolean): Promise<XAccess> {
+    const guestToken = await this.ensureGuestToken(forceGuest);
+    const { chatToken } = await resolveBroadcast(broadcastId, this.opts(guestToken));
+    const { endpoint, accessToken } = await getChatAccess(chatToken, this.opts());
     this.log.debug(`periscope access ok for ${broadcastId}`);
     return { chatWsUrl: chatWsUrl(endpoint), accessToken, expiresAt: Date.now() + this.ttlMs };
   }
+
   close(): void {}
 }
 

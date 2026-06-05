@@ -38,9 +38,13 @@ export interface XConfig {
   /** BETA feature flag. X (unofficial Periscope chat) is OFF unless X_ENABLED=true. */
   enabled: boolean;
   mode: XMode;
-  /** Periscope API base host (X_API_BASE); defaults to the public pscp.tv host. */
+  /** Modern x.com API base for guest token + broadcast resolution (X_API_BASE). */
   apiBase?: string;
-  /** Optional guest/auth token for gated broadcasts (TODO recon). */
+  /** Periscope API base for chat access (X_PSCP_BASE). */
+  pscpBase?: string;
+  /** Override the public web bearer used for guest auth (X_BEARER). */
+  bearer?: string;
+  /** A pre-minted guest token, skipping activate.json (X_GUEST_TOKEN). */
   guestToken?: string;
   /** static: a chat socket URL captured directly from DevTools. */
   chatWsUrl?: string;
@@ -180,6 +184,8 @@ export function loadConfig(): AppConfig {
       enabled: bool(process.env.X_ENABLED),
       mode: (str(process.env.X_MODE) as XMode) ?? "auto",
       apiBase: str(process.env.X_API_BASE),
+      pscpBase: str(process.env.X_PSCP_BASE),
+      bearer: str(process.env.X_BEARER),
       guestToken: str(process.env.X_GUEST_TOKEN),
       chatWsUrl: str(process.env.X_CHAT_WS_URL),
       accessToken: str(process.env.X_ACCESS_TOKEN),

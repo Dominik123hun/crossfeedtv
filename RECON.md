@@ -94,21 +94,34 @@ names** (`Kick-Event-*`), and the **payload field names** in `chat.message.sent`
 
 ## X (Twitter) broadcasts — EXPERIMENTAL / BETA (unofficial)
 
-X has **no official** broadcast-chat API; broadcasts still run on the legacy
-**Periscope (pscp.tv)** backend. The ingester now implements the **real public
-handshake** the web player uses, as three testable functions in
+X has **no official** broadcast-chat API; broadcasts run on the **Periscope**
+backend, resolved through the modern **x.com guest API**. The ingester implements
+this as testable functions in
 [`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts):
 
-1. `resolveBroadcast(id)` → `GET https://proxsee.pscp.tv/api/v2/accessVideoPublic?broadcast_id={id}&replay_redirect=false` → `chat_token`
+0. `getGuestToken()` → `POST https://api.x.com/1.1/guest/activate.json` (public web bearer) → `guest_token`
+1. `resolveBroadcast(id)` → `GET https://api.x.com/1.1/broadcasts/show.json?ids={id}&include_events=true` (bearer + `x-guest-token`) → `chat_token`
 2. `getChatAccess(chatToken)` → `GET https://proxsee.pscp.tv/api/v2/accessChatPublic?chat_token={chat_token}` → `{ endpoint, access_token }`
 3. `connectChat({ wsUrl, accessToken, broadcastId })` → open `wss://{endpoint}/chatapi/v1/chatnow`, send the **auth** then **join** frame, parse `{ kind, payload }` frames.
 
-These endpoints, field names, the `wss` path, and the auth/join frame shapes were
-taken from the live-reader references — **IgnatBeresnev/periscope-chat-downloader**
-(the `accessVideoPublic → chat_token`, `accessChatPublic → {endpoint, access_token}`
-flow) and **jferas/ScopeSpeaker** (the `…/chatapi/v1/chatnow` wss path and the
-exact `kind:3` auth + `kind:2` join frames). They are unofficial and can change —
-this section is how to **verify/refresh** them, and how to handle gated broadcasts.
+The resolve host/endpoint (`api.x.com/1.1/broadcasts/show.json`) is from the
+current **offish/twitter-x-broadcast-downloader**; the chat access + socket flow
+is from **IgnatBeresnev/periscope-chat-downloader** (`accessChatPublic → {endpoint,
+access_token}`) and **jferas/ScopeSpeaker** (the `…/chatapi/v1/chatnow` wss path +
+the exact `kind:3` auth / `kind:2` join frames). Unofficial — this section is how
+to **verify/refresh** each step.
+
+> **The legacy public `proxsee.pscp.tv/accessVideoPublic` path 404s for modern
+> x.com broadcasts** — that's why resolution now goes through the guest API. A
+> `broadcasts/show HTTP 404` usually means the broadcast isn't live/public.
+
+**Verify a single broadcast in one command** (no need to enable X or open OBS):
+
+```
+npm run x:probe -- <broadcastId | x.com/i/broadcasts/… URL>
+```
+
+It runs steps 0→2 and prints each result or the exact failing step.
 
 ### Beta flag (required to turn it on)
 
@@ -123,23 +136,28 @@ A user enters a **broadcast id** or pastes the `x.com/i/broadcasts/<id>` URL
 (the id is parsed out). For a quick single-broadcast smoke test you can also set
 `X_BROADCAST_ID` and run with `X_ENABLED=true`.
 
-### If it breaks — verify the handshake in DevTools
+### If it breaks — verify each step in DevTools
+
+Run `npm run x:probe -- <id>` first; it tells you which step fails. Then:
 
 1. Open a **currently-live** broadcast on `x.com` → DevTools (`F12`) → **Network**
    → enable **Preserve log**.
-2. **Resolve:** find the `accessVideoPublic` (or equivalent) XHR → **Response** →
-   confirm the field that carries the chat token is still `chat_token`. If the
-   host changed, set `X_API_BASE` (default `https://proxsee.pscp.tv/api/v2`).
-   If a **guest token** / `Authorization` header is now required, capture it →
-   `X_GUEST_TOKEN` (the `TODO(recon)` auth header in `x-periscope.ts`).
-3. **Access:** find `accessChatPublic` → **Response** → confirm `endpoint` and
-   `access_token`.
-4. **WebSocket:** **WS** filter → open the chat socket → confirm the URL is the
+2. **Guest token:** if the probe fails at `guest/activate` with 401/403, x.com has
+   rotated the public bearer → grab the `authorization: Bearer …` header from any
+   guest request and set `X_BEARER`. (Or paste an `x-guest-token` value into
+   `X_GUEST_TOKEN` to skip activation.)
+3. **Resolve:** find `broadcasts/show.json` → **Response** → confirm the
+   `chat_token` field's location. `extractChatToken` searches `broadcasts[id]`,
+   the top level, then deep — but if the key was renamed, update it in
+   `x-periscope.ts`. Host moved? set `X_API_BASE`.
+4. **Access:** find `accessChatPublic` → **Response** → confirm `endpoint` +
+   `access_token`. Host moved? set `X_PSCP_BASE`.
+5. **WebSocket:** **WS** filter → open the chat socket → confirm the URL is the
    `endpoint` host + `/chatapi/v1/chatnow` (https→wss). On the **Messages** tab,
    the **first two client→server** frames are the auth (`{"kind":3,…}`) then join
    (`{"kind":2,…}`). If they differ, set a single replacement via
    `X_SUBSCRIBE_FRAME` (sent verbatim instead of auth+join).
-5. **Chat frames:** an incoming chat frame is `{ "kind":1, "payload":"…json…" }`.
+6. **Chat frames:** an incoming chat frame is `{ "kind":1, "payload":"…json…" }`.
    Decode `payload`: `payload.body` is a JSON string whose `.body` is the message
    text; `payload.sender` is a JSON string with `username` / `display_name`.
    Confirm the still-`TODO(recon)` keys in
@@ -151,8 +169,10 @@ A user enters a **broadcast id** or pastes the `x.com/i/broadcasts/<id>` URL
 | Env var            | Meaning                                                            |
 | ------------------ | ----------------------------------------------------------------- |
 | `X_ENABLED`        | Beta flag — must be `true` for X to connect (default off).        |
-| `X_API_BASE`       | Periscope API base (default `https://proxsee.pscp.tv/api/v2`).    |
-| `X_GUEST_TOKEN`    | Optional bearer for **gated** broadcasts (TODO recon header).     |
+| `X_API_BASE`       | x.com API base (default `https://api.x.com/1.1`).                 |
+| `X_PSCP_BASE`      | Periscope chat base (default `https://proxsee.pscp.tv/api/v2`).   |
+| `X_BEARER`         | Override the public web bearer if guest auth 401s.                |
+| `X_GUEST_TOKEN`    | Pre-minted guest token (skips `activate.json`).                   |
 | `X_BROADCAST_ID`   | A broadcast id to connect on startup (or use the dashboard).      |
 | `X_SUBSCRIBE_FRAME`| Override the on-open frame(s) if the protocol changes.            |
 
@@ -160,7 +180,8 @@ A user enters a **broadcast id** or pastes the `x.com/i/broadcasts/<id>` URL
 
 | Constant (file)                         | Meaning / how to confirm                          |
 | --------------------------------------- | ------------------------------------------------- |
-| `guestToken` header (`x-periscope.ts`)  | exact auth header for gated broadcasts            |
+| `DEFAULT_WEB_BEARER` (`x-periscope.ts`) | public web bearer; X may rotate it (→ `X_BEARER`) |
+| `extractChatToken` (`x-periscope.ts`)   | exact `chat_token` location in show.json          |
 | `SENDER_COLOR` (`x-normalize.ts`)       | sender color key, if X sends one                  |
 | `PAYLOAD_ID` (`x-normalize.ts`)         | stable per-message id key (assumed `uuid`)        |
 | `PAYLOAD_TS` (`x-normalize.ts`)         | timestamp key + units (assumed ms)                |

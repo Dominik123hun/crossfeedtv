@@ -1,46 +1,50 @@
 import WebSocket from "ws";
 
 /* ───────────────────────────────────────────────────────────────────────────
-   X (Twitter) broadcast chat — the real pscp.tv (Periscope) handshake.
+   X (Twitter) broadcast chat — modern resolution + the Periscope chat socket.
 
-   X has NO official broadcast-chat API; broadcasts still run on the legacy
-   Periscope backend. The three steps below replicate what x.com's web player
-   does for a PUBLIC broadcast (no login):
+   X has NO official broadcast-chat API. A current x.com broadcast resolves like
+   the web/guest clients do (verified against offish/twitter-x-broadcast-downloader
+   for the resolve host, and periscope-chat-downloader + ScopeSpeaker for chat):
 
-     1. resolveBroadcast(id)      GET  accessVideoPublic  → chat_token
-     2. getChatAccess(chatToken)  GET  accessChatPublic   → { endpoint, access_token }
-     3. connectChat({ wsUrl, accessToken, broadcastId })  → open WS, send auth+join
+     0. getGuestToken()           POST api.x.com/1.1/guest/activate.json   -> guest_token
+     1. resolveBroadcast(id)      GET  api.x.com/1.1/broadcasts/show.json  -> chat_token
+                                       ?ids=<id>&include_events=true (bearer + x-guest-token)
+     2. getChatAccess(chatToken)  GET  proxsee.pscp.tv/.../accessChatPublic -> { endpoint, access_token }
+     3. connectChat({...})        wss://{endpoint}/chatapi/v1/chatnow, send auth+join
 
-   Endpoints, field names, the wss path, and the auth/join frame shapes below are
-   VERIFIED against:
-     • IgnatBeresnev/periscope-chat-downloader  (accessVideoPublic→chat_token,
-       accessChatPublic→{endpoint, access_token})
-     • jferas/ScopeSpeaker                       (live wss path + auth/join frames)
-   Anything still unconfirmed is a clearly named TODO(recon); see RECON.md.
+   The legacy public `accessVideoPublic` path 404s for modern broadcasts — that's
+   why resolution goes through api.x.com with a guest token. Values that still
+   need a live capture to confirm are marked TODO(recon); see RECON.md.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/** Public Periscope API base (verified: periscope-chat-downloader). Overridable via X_API_BASE. */
+/** Modern x.com API base (guest token + broadcast resolution). Override: X_API_BASE. */
+export const X_API_BASE = "https://api.x.com/1.1";
+/** Periscope API base for chat access. Override: X_PSCP_BASE. */
 export const PSCP_API_BASE = "https://proxsee.pscp.tv/api/v2";
 
-/** Verified response field names (periscope-chat-downloader DTO @SerialName). */
-const FIELD_CHAT_TOKEN = "chat_token";
-const FIELD_ENDPOINT = "endpoint";
-const FIELD_ACCESS_TOKEN = "access_token";
+/**
+ * Public web "guest" bearer shipped by x.com's web client (NOT a secret, not
+ * user-specific — the same token guest API clients like yt-dlp/snscrape use).
+ * TODO(recon): X may rotate it; override with X_BEARER if guest auth starts 401ing.
+ */
+const DEFAULT_WEB_BEARER =
+  "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA";
 
 /** Live chat path appended to the access `endpoint`, then https→wss (ScopeSpeaker). */
 const CHAT_WS_PATH = "/chatapi/v1/chatnow";
 
-export interface PeriscopeOpts {
-  /** Override the API base (X_API_BASE). */
-  apiBase?: string;
+export interface XApiOpts {
+  /** api.x.com base (guest token + broadcasts/show). */
+  xApiBase?: string;
+  /** Periscope base for accessChatPublic. */
+  pscpApiBase?: string;
+  /** Web bearer for guest auth (override X_BEARER). */
+  bearer?: string;
+  /** A pre-minted guest token (skips activate.json when provided). */
+  guestToken?: string;
   /** Injectable fetch (tests pass a fake; defaults to global fetch). */
   fetchImpl?: typeof fetch;
-  /**
-   * TODO(recon): some non-public broadcasts require a guest/auth token. The
-   * PUBLIC path needs none; when set we forward it as a bearer. Confirm the
-   * exact header/param from DevTools for gated broadcasts (see RECON.md).
-   */
-  guestToken?: string;
   signal?: AbortSignal;
 }
 
@@ -60,7 +64,6 @@ export function parseBroadcastId(input: string | undefined): string | undefined 
   if (!input) return undefined;
   const s = String(input).trim();
   if (!s) return undefined;
-  // Bare id: no slash, no scheme.
   if (!s.includes("/") && !s.includes(":") && !/\s/.test(s)) return cleanId(s);
   try {
     const url = new URL(s.includes("://") ? s : `https://${s}`);
@@ -79,42 +82,80 @@ function cleanId(id: string): string | undefined {
   return /^[A-Za-z0-9_-]{4,}$/.test(c) ? c : undefined;
 }
 
-async function getJson(
-  url: string,
-  opts: PeriscopeOpts,
-  what: string,
-): Promise<Record<string, unknown>> {
-  const f = opts.fetchImpl ?? fetch;
-  const headers: Record<string, string> = { accept: "application/json" };
-  // TODO(recon): confirm the exact auth header for gated broadcasts.
-  if (opts.guestToken) headers["authorization"] = `Bearer ${opts.guestToken}`;
-  const res = await f(url, { headers, signal: opts.signal });
-  if (!res.ok) {
-    throw new Error(`${what} HTTP ${res.status} (broadcast offline/not public? see RECON.md)`);
-  }
-  return (await res.json()) as Record<string, unknown>;
+/** True for an auth-shaped failure (so callers can refresh the guest token + retry). */
+export function isAuthError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err);
+  return /HTTP (401|403)\b/.test(m);
 }
 
-/** Step 1: resolve a broadcast by id → its chat token. */
-export async function resolveBroadcast(
-  broadcastId: string,
-  opts: PeriscopeOpts = {},
-): Promise<BroadcastInfo> {
-  const base = opts.apiBase ?? PSCP_API_BASE;
-  const url = `${base}/accessVideoPublic?broadcast_id=${encodeURIComponent(broadcastId)}&replay_redirect=false`;
-  const json = await getJson(url, opts, "accessVideoPublic");
-  const chatToken = typeof json[FIELD_CHAT_TOKEN] === "string" ? (json[FIELD_CHAT_TOKEN] as string) : "";
-  if (!chatToken) throw new Error("accessVideoPublic: no chat_token in response (see RECON.md)");
+/** Step 0: mint a guest token from the public bearer. */
+export async function getGuestToken(opts: XApiOpts = {}): Promise<string> {
+  const base = opts.xApiBase ?? X_API_BASE;
+  const f = opts.fetchImpl ?? fetch;
+  const res = await f(`${base}/guest/activate.json`, {
+    method: "POST",
+    headers: { authorization: opts.bearer ?? DEFAULT_WEB_BEARER },
+    signal: opts.signal,
+  });
+  if (!res.ok) throw new Error(`guest/activate HTTP ${res.status} (bearer rotated? see RECON.md)`);
+  const json = (await res.json()) as Record<string, unknown>;
+  const token = typeof json["guest_token"] === "string" ? (json["guest_token"] as string) : "";
+  if (!token) throw new Error("guest/activate: no guest_token in response (see RECON.md)");
+  return token;
+}
+
+/** Step 1: resolve a broadcast id → its chat token (modern x.com path). */
+export async function resolveBroadcast(broadcastId: string, opts: XApiOpts = {}): Promise<BroadcastInfo> {
+  const bearer = opts.bearer ?? DEFAULT_WEB_BEARER;
+  const guestToken = opts.guestToken ?? (await getGuestToken(opts));
+  const base = opts.xApiBase ?? X_API_BASE;
+  const url = `${base}/broadcasts/show.json?ids=${encodeURIComponent(broadcastId)}&include_events=true`;
+  const f = opts.fetchImpl ?? fetch;
+  const res = await f(url, {
+    headers: { authorization: bearer, "x-guest-token": guestToken, accept: "application/json" },
+    signal: opts.signal,
+  });
+  if (!res.ok) throw new Error(`broadcasts/show HTTP ${res.status} (offline/not public? see RECON.md)`);
+  const json = (await res.json()) as Record<string, unknown>;
+  const chatToken = extractChatToken(json, broadcastId);
+  if (!chatToken) throw new Error("broadcasts/show: no chat_token found (confirm the field — see RECON.md)");
   return { chatToken };
 }
 
+/** TODO(recon): exact location of chat_token in broadcasts/show.json — search defensively. */
+function extractChatToken(json: Record<string, unknown>, id: string): string {
+  const broadcasts = json["broadcasts"];
+  if (broadcasts && typeof broadcasts === "object") {
+    const b = (broadcasts as Record<string, unknown>)[id];
+    const t = b && typeof b === "object" ? (b as Record<string, unknown>)["chat_token"] : undefined;
+    if (typeof t === "string" && t) return t;
+  }
+  if (typeof json["chat_token"] === "string" && json["chat_token"]) return json["chat_token"] as string;
+  return deepFindString(json, "chat_token") ?? "";
+}
+
+function deepFindString(obj: unknown, key: string, depth = 0): string | undefined {
+  if (depth > 6 || obj == null || typeof obj !== "object") return undefined;
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    if (k === key && typeof v === "string" && v) return v;
+    if (v && typeof v === "object") {
+      const found = deepFindString(v, key, depth + 1);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
 /** Step 2: exchange the chat token for the chat socket endpoint + access token. */
-export async function getChatAccess(chatToken: string, opts: PeriscopeOpts = {}): Promise<ChatAccess> {
-  const base = opts.apiBase ?? PSCP_API_BASE;
+export async function getChatAccess(chatToken: string, opts: XApiOpts = {}): Promise<ChatAccess> {
+  const base = opts.pscpApiBase ?? PSCP_API_BASE;
   const url = `${base}/accessChatPublic?chat_token=${encodeURIComponent(chatToken)}`;
-  const json = await getJson(url, opts, "accessChatPublic");
-  const endpoint = typeof json[FIELD_ENDPOINT] === "string" ? (json[FIELD_ENDPOINT] as string) : "";
-  const accessToken = typeof json[FIELD_ACCESS_TOKEN] === "string" ? (json[FIELD_ACCESS_TOKEN] as string) : "";
+  const f = opts.fetchImpl ?? fetch;
+  const res = await f(url, { headers: { accept: "application/json" }, signal: opts.signal });
+  if (!res.ok) throw new Error(`accessChatPublic HTTP ${res.status} (see RECON.md)`);
+  const json = (await res.json()) as Record<string, unknown>;
+  const endpoint = typeof json["endpoint"] === "string" ? (json["endpoint"] as string) : "";
+  const accessToken = typeof json["access_token"] === "string" ? (json["access_token"] as string) : "";
   if (!endpoint || !accessToken) {
     throw new Error("accessChatPublic: missing endpoint/access_token (see RECON.md)");
   }
@@ -129,18 +170,12 @@ export function chatWsUrl(endpoint: string): string {
   return url;
 }
 
-/**
- * First frame after the socket opens — authorize with the access token.
- * Shape verified against ScopeSpeaker: { kind:3, payload:"<json string>" }.
- */
+/** First frame after open — authorize with the access token (ScopeSpeaker: kind 3). */
 export function buildAuthFrame(accessToken: string): string {
   return JSON.stringify({ kind: 3, payload: JSON.stringify({ access_token: accessToken }) });
 }
 
-/**
- * Second frame — join the broadcast's chat room. ScopeSpeaker sends
- * { kind:2, payload: stringify({ kind:1, body: stringify({ room:<id> }) }) }.
- */
+/** Second frame — join the broadcast's chat room (ScopeSpeaker: kind 2). */
 export function buildJoinFrame(broadcastId: string): string {
   return JSON.stringify({
     kind: 2,
@@ -152,7 +187,6 @@ export interface ChatConn {
   wsUrl: string;
   accessToken: string;
   broadcastId: string;
-  /** Optional single-frame override (X_SUBSCRIBE_FRAME) instead of auth+join. */
   subscribeFrameOverride?: string;
   onOpen?: () => void;
   onMessage?: (raw: string) => void;
@@ -160,11 +194,7 @@ export interface ChatConn {
   onClose?: (code: number) => void;
 }
 
-/**
- * Step 3: open the chat WebSocket and perform the on-open handshake. Returns the
- * socket so the caller (XIngester) owns its lifecycle. Pure transport — parsing
- * happens in x-normalize.
- */
+/** Step 3: open the chat WebSocket and perform the on-open handshake. */
 export function connectChat(conn: ChatConn): WebSocket {
   const ws = new WebSocket(conn.wsUrl);
   ws.on("open", () => {
