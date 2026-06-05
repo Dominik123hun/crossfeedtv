@@ -59,17 +59,17 @@
               <form class="channels" id="channelsForm">
                 <div class="channel-row">
                   <span class="pill twitch" id="pillTwitch">Twitch</span>
-                  <input class="input" id="twitchInput" placeholder="channel login, e.g. xqc" autocomplete="off" />
+                  <input class="input" id="twitchInput" aria-label="Twitch channel" placeholder="channel login, e.g. xqc" autocomplete="off" />
                   <span class="hint">Your Twitch channel name (no # or URL).</span>
                 </div>
                 <div class="channel-row">
                   <span class="pill kick" id="pillKick">Kick</span>
-                  <input class="input" id="kickInput" placeholder="channel slug, e.g. xqc" autocomplete="off" />
+                  <input class="input" id="kickInput" aria-label="Kick channel" placeholder="channel slug, e.g. xqc" autocomplete="off" />
                   <span class="hint">Your Kick channel slug.</span>
                 </div>
                 <div class="channel-row">
                   <span class="pill x" id="pillX">X</span>
-                  <input class="input" id="xInput" placeholder="broadcast id" autocomplete="off" />
+                  <input class="input" id="xInput" aria-label="X broadcast id" placeholder="broadcast id" autocomplete="off" />
                   <span class="hint">The id of your live X broadcast.</span>
                 </div>
                 <div class="channels-actions">
@@ -100,7 +100,7 @@
               <div class="panel-title">Your overlay URL</div>
               <p class="panel-sub">Unique to your account — it streams only your merged feed.</p>
               <div class="url-row">
-                <input class="input" id="overlayUrl" readonly value="" />
+                <input class="input" id="overlayUrl" aria-label="Your overlay URL" readonly value="" />
                 <button class="btn btn-primary" id="copyBtn" type="button">Copy</button>
               </div>
               <div class="url-meta">
@@ -120,12 +120,12 @@
               <div class="settings" id="settings">
                 <div class="set-row">
                   <label for="setFont">Font size</label>
-                  <input type="range" id="setFont" min="12" max="40" step="1" />
+                  <input type="range" id="setFont" min="12" max="40" step="1" aria-describedby="setFontVal" />
                   <span class="set-val" id="setFontVal">18px</span>
                 </div>
                 <div class="set-row">
                   <label for="setOpacity">Background panel</label>
-                  <input type="range" id="setOpacity" min="0" max="90" step="5" />
+                  <input type="range" id="setOpacity" min="0" max="90" step="5" aria-describedby="setOpacityVal" />
                   <span class="set-val" id="setOpacityVal">Off</span>
                 </div>
                 <div class="set-row">
@@ -165,7 +165,7 @@
       </div>
     </main>
 
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="dashboard.js"></script>
   </body>
 </html>

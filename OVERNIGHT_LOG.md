@@ -120,3 +120,23 @@
 - **Review:** overlay DOM rendering of settings (corner anchors, per-platform
   hide, translucent panel) is covered by the contract test on the pushed frame
   but not by a headless-DOM test — eyeball it once in a browser.
+
+### Item 5 — Accessibility, responsive & perf (additive)
+- **Audited** landing + dashboard. Already good: semantic `header/main/section/
+  nav/footer`, native links/buttons, `<details>` FAQ, `:focus-visible` styles,
+  `lang="en"` on all pages, `aria-live` status regions, per-component
+  reduced-motion guards, and existing mobile breakpoints.
+- **Additive fixes:**
+  - **Global reduced-motion safety net** in `theme.css` (neutralizes all
+    animation/transition durations) so nothing slips through.
+  - **Programmatic labels** added where missing: `aria-label` on the Twitch/Kick/X
+    channel inputs and the overlay-URL input; `aria-describedby` linking the font/
+    opacity sliders to their value readouts; `role="status" aria-live="polite"`
+    on the toast.
+  - **Contrast:** bumped `--text-faint` (`#6c7682` → `#7c8694`) for AA on the
+    near-black base (affects hints/footer/placeholders).
+- Did NOT make risky perf changes — rendering already uses rAF batching + DOM/queue
+  caps; no obvious waste worth a risky edit.
+- **Files:** `public/theme.css`, `public/dashboard.html`.
+- **Tests:** build green; `npm test` = **57 passing** (static-only changes).
+- **Review:** none required; a visual once-over on a phone is nice-to-have.

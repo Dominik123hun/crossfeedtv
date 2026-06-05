@@ -17,7 +17,8 @@
   /* Text */
   --text: #eef1f5;
   --text-dim: #a4adba;
-  --text-faint: #6c7682;
+  /* bumped for AA contrast on the near-black base (was #6c7682) */
+  --text-faint: #7c8694;
 
   /* Platform accents (the real brand colors) */
   --twitch: #9146ff;
@@ -54,6 +55,14 @@ html {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  /* Global safety net: neutralize all motion for users who opt out. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
