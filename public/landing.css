@@ -47,10 +47,57 @@
 .hero-bg {
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   pointer-events: none;
+  overflow: hidden;
   /* Quiet fallback: a single faint violet whisper behind the feed; near-black elsewhere. */
   background: radial-gradient(46% 78% at 90% 42%, rgba(145, 70, 255, 0.06), transparent 60%);
+}
+/* Always-on cinematic motion — faint violet/green light slowly drifting on the
+   right. This is the "motion" you see even before the generated hero video is
+   added; right-weighted so the headline (left) stays on calm near-black. */
+.hero-bg .aurora {
+  position: absolute;
+  inset: -25%;
+  background:
+    radial-gradient(38% 50% at 78% 36%, rgba(145, 70, 255, 0.18), transparent 62%),
+    radial-gradient(32% 44% at 92% 64%, rgba(83, 252, 24, 0.08), transparent 60%),
+    radial-gradient(42% 52% at 66% 52%, rgba(162, 107, 255, 0.1), transparent 64%);
+  filter: blur(30px);
+  will-change: transform, opacity;
+  animation: auroraDrift 22s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift {
+  0% {
+    transform: translate3d(-3%, -2%, 0) scale(1.05) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(2%, 1%, 0) scale(1.14) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(4%, -1%, 0) scale(1.07) rotate(-3deg);
+    opacity: 0.82;
+  }
+}
+/* The generated DARK hero video loop — fades in over the aurora when present. */
+.hero-video {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: right center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1s ease;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 42%);
+  mask-image: linear-gradient(90deg, transparent, #000 42%);
+}
+.hero-video.is-playing {
+  opacity: 0.85;
 }
 /* The generated DARK backdrop image, kept subtle so the live feed stays the star. */
 .hero-bg::after {
@@ -626,11 +673,34 @@
 }
 
 /* ── Reduced motion ── */
+/* Scroll-reveal entrance (JS adds .reveal, then .in when in view). */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.6s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .msg {
     animation: none;
   }
   .live-tag::before {
     animation: none;
+  }
+  .hero-bg .aurora {
+    animation: none;
+  }
+  .hero-video {
+    display: none;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

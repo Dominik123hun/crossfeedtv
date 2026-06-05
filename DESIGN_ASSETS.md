@@ -30,8 +30,10 @@ source URL has expired, regenerate it from the prompt below (Higgsfield).
 
 | File (target) | What | Source (Higgsfield) | Model · ratio |
 | --- | --- | --- | --- |
-| `public/assets/hero.webp` | Hero backdrop — **dark/subtle** convergence, right-weighted, deep left negative space for text | job `b9c3a49b` (dark) | soul_location · 16:9 |
-| `public/assets/hero-mobile.webp` | Vertical hero variant — **dark/subtle**, convergence up top | job `35781963` (dark) | soul_location · 9:16 |
+| `public/assets/hero.mp4` | **Hero motion loop (desktop)** — the dark backdrop animated; fades in over the always-on CSS aurora. The signature motion piece. | job `7137edc5` | seedance_2_0 · 16:9 |
+| `public/assets/hero-mobile.mp4` | **Hero motion loop (vertical)** — mobile hero video | job `e61a9d10` | seedance_2_0 · 9:16 |
+| `public/assets/hero.webp` | Hero **video poster** (desktop) — dark convergence, shown while the video buffers | job `b9c3a49b` (dark) | soul_location · 16:9 |
+| `public/assets/hero-mobile.webp` | Hero **video poster** (vertical) | job `35781963` (dark) | soul_location · 9:16 |
 | `public/assets/stream-scene.webp` | Abstract atmospheric "stream room" backdrop for the OBS section | job `63a268f1` | soul_location · 16:9 |
 | `public/assets/texture.webp` | Subtle section texture — quiet near-black depth (optional; CSS fallback ships) | job `e48c1d0c` | soul_location · 16:9 |
 | `public/assets/glyph.webp` | Logo mark / favicon (served as `image/webp`) — lines merging into one node | job `8a03fdf0` | nano_banana_pro · 1:1 |
@@ -40,6 +42,17 @@ source URL has expired, regenerate it from the prompt below (Higgsfield).
 ### Download (ready-to-save WebP → target filename)
 
 Save each into `public/assets/` with the name on the left:
+
+**Hero motion video (the new centerpiece — `.mp4`):**
+
+- `hero.mp4` (desktop) → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_232942_7137edc5-8724-4ca0-b65a-87056c74741a.mp4`
+- `hero-mobile.mp4` (vertical) → job `e61a9d10` — grab the `.mp4` URL from the Higgsfield result once it finishes rendering (the first 9:16 attempt was a false-positive NSFW flag; this is the retry).
+
+> Until you add `hero.mp4`/`hero-mobile.mp4`, the hero shows an **animated CSS
+> aurora** (always-on motion) so it already looks like a motion site. Drop the
+> videos in and they fade in over it. `prefers-reduced-motion` disables both.
+
+**Stills (posters + section art — `.webp`):**
 
 - `hero.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_171216_b9c3a49b-43f1-444f-89e3-7643c7057bb4_min.webp`
 - `hero-mobile.webp` → `https://d8j0ntlcm91z4.cloudfront.net/user_3D0Il7JgYWTFGs1800Z26K2HBcy/hf_20260605_171704_35781963-b49c-4e63-a99c-020cc22e7a77_min.webp`

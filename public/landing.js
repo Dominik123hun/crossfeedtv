@@ -259,28 +259,78 @@
     });
   }
 
-  // ── Scroll reveal (subtle, opt-out on reduced motion) ────────────────────
+  // ── Scroll reveal — staggered groups (opt-out on reduced motion) ─────────
   function setupReveal() {
     if (reduceMotion || !("IntersectionObserver" in window)) return;
-    var targets = document.querySelectorAll(".feature, .steps li, .stream-frame, .faq details");
-    targets.forEach(function (t) {
-      t.style.opacity = "0";
-      t.style.transform = "translateY(14px)";
-      t.style.transition = "opacity .5s ease, transform .5s ease";
-    });
+    var groups = [
+      document.querySelectorAll(".hero-copy > *"),
+      document.querySelectorAll(".feature"),
+      document.querySelectorAll(".steps li"),
+      document.querySelectorAll(".faq details"),
+      document.querySelectorAll(".section-title, .section-lead, .stream-frame, .cta-band > *"),
+    ];
     var io = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (e) {
           if (e.isIntersecting) {
-            e.target.style.opacity = "1";
-            e.target.style.transform = "none";
+            e.target.classList.add("in");
             io.unobserve(e.target);
           }
         });
       },
-      { threshold: 0.12 },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
     );
-    targets.forEach(function (t) { io.observe(t); });
+    groups.forEach(function (list) {
+      Array.prototype.forEach.call(list, function (t, i) {
+        t.classList.add("reveal");
+        t.style.transitionDelay = Math.min(i * 70, 280) + "ms";
+        io.observe(t);
+      });
+    });
+  }
+
+  // ── Hero video loop (progressive: aurora shows until the file is added) ───
+  function loadHeroVideo() {
+    if (reduceMotion) return; // CSS hides the video; the (static) aurora is enough
+    var v = document.querySelector(".hero-video");
+    if (!v) return;
+    var mobile = window.matchMedia && window.matchMedia("(max-width: 820px)").matches;
+    v.poster = mobile ? "/assets/hero-mobile.webp" : "/assets/hero.webp";
+    v.src = mobile ? "/assets/hero-mobile.mp4" : "/assets/hero.mp4";
+    v.addEventListener(
+      "canplay",
+      function () {
+        v.classList.add("is-playing");
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
+      },
+      { once: true },
+    );
+    // No file yet (404) -> stay hidden; the animated aurora remains the backdrop.
+    v.addEventListener("error", function () { v.classList.remove("is-playing"); });
+    v.load();
+  }
+
+  // ── Subtle hero parallax (rAF-throttled; off on reduced motion) ──────────
+  function setupParallax() {
+    if (reduceMotion) return;
+    var layers = [document.querySelector(".hero-bg"), document.querySelector(".hero-video")];
+    var ticking = false;
+    window.addEventListener(
+      "scroll",
+      function () {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(function () {
+          var y = window.scrollY || window.pageYOffset || 0;
+          var shift = Math.min(y * 0.12, 90);
+          var t = "translate3d(0," + shift.toFixed(1) + "px,0)";
+          layers.forEach(function (n) { if (n) n.style.transform = t; });
+          ticking = false;
+        });
+      },
+      { passive: true },
+    );
   }
 
   // Progressive-enhance the hero/section/scene art if the optimized assets exist.
@@ -307,8 +357,8 @@
     runFeed(document.getElementById("heroFeed"), reduceMotion ? 9 : 5, !reduceMotion);
     runFeed(document.getElementById("obsFeed"), 6, false);
     setupReveal();
-    loadArt(".hero-bg", "--hero-img", "/assets/hero.webp");
-    loadArt(".hero-bg", "--hero-img-m", "/assets/hero-mobile.webp");
+    loadHeroVideo(); // hero motion: generated video over the always-on aurora
+    setupParallax();
     loadArt(".stream-scene", "--scene-img", "/assets/stream-scene.webp");
     loadArt(".section-alt", "--texture-img", "/assets/texture.webp");
   });
