@@ -62,6 +62,34 @@ Map the captured values to env vars:
 | `version=<n>` in the socket URL  | `KICK_PUSHER_VERSION`  | `kick.ts` socket URL     |
 | `chatroom.id` from the v2 API    | (looked up at runtime) | `kick-lookup.ts`         |
 
+### Kick OFFICIAL API (optional, the "right" way) — groundwork is in the repo
+
+The unofficial Pusher path above works today, but the proper path is Kick's
+official API: **OAuth 2.1 (PKCE) → subscribe to `chat.message.sent` → Kick POSTs
+signed webhooks to your public URL**. A separate, feature-flagged adapter is
+already drafted in [`src/ingesters/kick-official.ts`](./src/ingesters/kick-official.ts)
+(signature verification + event→message mapping implemented and tested; OAuth/
+subscription endpoints stubbed with TODOs). It is **OFF by default** and does not
+touch the working ingester.
+
+To enable it:
+
+1. **Register an app** in Kick's developer portal → get a **client id/secret**
+   (`KICK_CLIENT_ID` / `KICK_CLIENT_SECRET`).
+2. **Expose a public HTTPS URL** that maps to `KICK_WEBHOOK_PATH` (default
+   `/webhooks/kick`) → set `KICK_WEBHOOK_PUBLIC_URL`.
+3. **Get Kick's event-signing public key** (PEM, from the portal/docs) →
+   `KICK_EVENT_PUBLIC_KEY` (use `\n` for newlines when inline).
+4. **OAuth + subscribe:** complete the OAuth 2.1 + PKCE flow and create a
+   `chat.message.sent` subscription pointing at your webhook URL. (The
+   `exchangeCodeForToken` / `subscribeToChatEvents` stubs mark exactly where.)
+5. Set `KICK_OFFICIAL_ENABLED=true` and restart.
+
+While wiring it, confirm the `TODO(kick-official)` items against the current docs:
+OAuth/subscribe endpoint URLs, the **signed-content concatenation** used for the
+signature (this repo assumes `messageId.timestamp.rawBody`), the webhook **header
+names** (`Kick-Event-*`), and the **payload field names** in `chat.message.sent`.
+
 ---
 
 ## X (Twitter) broadcasts

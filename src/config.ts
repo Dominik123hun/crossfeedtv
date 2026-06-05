@@ -85,6 +85,15 @@ export interface AppConfig {
   cookieSecure?: boolean;
   /** Rate limiting for auth endpoints (signup/login), per client IP. */
   auth: { rateMax: number; rateWindowMs: number };
+  /** Official Kick adapter (OAuth + webhooks). OFF by default — groundwork only. */
+  kickOfficial: {
+    enabled: boolean;
+    clientId?: string;
+    clientSecret?: string;
+    webhookPath: string;
+    webhookPublicUrl?: string;
+    eventPublicKeyPem?: string;
+  };
 }
 
 /**
@@ -179,6 +188,15 @@ export function loadConfig(): AppConfig {
     auth: {
       rateMax: int(process.env.AUTH_RATE_MAX, 20),
       rateWindowMs: int(process.env.AUTH_RATE_WINDOW_MS, 5 * 60 * 1000),
+    },
+    kickOfficial: {
+      enabled: bool(process.env.KICK_OFFICIAL_ENABLED),
+      clientId: str(process.env.KICK_CLIENT_ID),
+      clientSecret: str(process.env.KICK_CLIENT_SECRET),
+      webhookPath: str(process.env.KICK_WEBHOOK_PATH) ?? "/webhooks/kick",
+      webhookPublicUrl: str(process.env.KICK_WEBHOOK_PUBLIC_URL),
+      // PEM in env typically uses escaped newlines.
+      eventPublicKeyPem: str(process.env.KICK_EVENT_PUBLIC_KEY)?.replace(/\\n/g, "\n"),
     },
   };
 }

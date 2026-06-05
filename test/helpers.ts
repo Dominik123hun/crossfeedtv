@@ -99,6 +99,9 @@ export interface TestServerOptions {
   /** Auth rate-limit max attempts per IP (high by default so tests don't trip it). */
   authRateMax?: number;
   authRateWindowMs?: number;
+  /** Official Kick adapter (off by default). */
+  kickOfficialEnabled?: boolean;
+  kickEventPublicKeyPem?: string;
 }
 
 export async function startServer(opts: TestServerOptions = {}): Promise<TestServer> {
@@ -117,6 +120,11 @@ export async function startServer(opts: TestServerOptions = {}): Promise<TestSer
     sessionTtlMs: opts.sessionTtlMs ?? 30 * 24 * 60 * 60 * 1000,
     cookieSecure: false,
     auth: { rateMax: opts.authRateMax ?? 100000, rateWindowMs: opts.authRateWindowMs ?? 60000 },
+    kickOfficial: {
+      enabled: opts.kickOfficialEnabled ?? false,
+      webhookPath: "/webhooks/kick",
+      eventPublicKeyPem: opts.kickEventPublicKeyPem,
+    },
   };
   const bus = new FakeBus();
   const hub = new Hub(cfg, makeFakeFactories(bus));
@@ -164,6 +172,8 @@ export interface HttpOptions {
   noCsrf?: boolean;
   /** Send a raw (possibly invalid) body instead of JSON. */
   rawBody?: string;
+  /** Extra request headers (e.g. webhook signature headers). */
+  headers?: Record<string, string>;
 }
 
 export function httpReq(
@@ -182,6 +192,7 @@ export function httpReq(
     }
     if (method !== "GET" && !opts.noCsrf) headers["x-requested-with"] = "fetch";
     if (opts.cookie) headers["cookie"] = opts.cookie;
+    if (opts.headers) Object.assign(headers, opts.headers);
     const req = http.request(
       { host: u.hostname, port: u.port, path: u.pathname + u.search, method, headers },
       (res) => {

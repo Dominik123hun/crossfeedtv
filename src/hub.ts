@@ -367,6 +367,15 @@ export class Hub {
 
   // --- Fan-out -------------------------------------------------------------
 
+  /**
+   * Route an externally-sourced normalized message (e.g. the official Kick
+   * webhook) to subscribers, exactly like a real ingester message. Additive;
+   * only used when the official Kick adapter is enabled.
+   */
+  injectExternal(platform: Platform, channel: string, msg: NormalizedMessage): void {
+    this.route(keyOf(platform, channel), msg);
+  }
+
   private route(key: string, msg: NormalizedMessage): void {
     const data = JSON.stringify({ type: "chat", msg } satisfies ServerFrame);
     for (const client of this.clients.values()) {

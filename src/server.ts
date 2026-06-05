@@ -5,6 +5,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { createApi } from "./api";
 import type { AppConfig } from "./config";
 import type { FeedSubscription, Hub } from "./hub";
+import { handleKickWebhook } from "./ingesters/kick-official";
 import { logger } from "./logger";
 import type { Store } from "./store";
 
@@ -69,6 +70,23 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || "/", "http://localhost");
+
+    // Official Kick webhook receiver — only mounted when explicitly enabled.
+    if (
+      cfg.kickOfficial.enabled &&
+      req.method === "POST" &&
+      url.pathname === cfg.kickOfficial.webhookPath
+    ) {
+      readRawBody(req, (raw) => {
+        const result = handleKickWebhook(cfg.kickOfficial, req.headers, raw);
+        if (result.status === 200 && result.msg && result.channel) {
+          hub.injectExternal("kick", result.channel, result.msg);
+        }
+        res.writeHead(result.status);
+        res.end();
+      });
+      return;
+    }
 
     if (url.pathname.startsWith("/api/")) {
       void api.handle(req, res, url).catch((err) => {
@@ -143,6 +161,9 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
         server.listen(cfg.port, cfg.host, () => {
           log.info(`HTTP + WS listening on http://${cfg.host}:${cfg.port}`);
           log.info(`landing: http://localhost:${cfg.port}/  ·  dashboard: /dashboard  ·  overlay: /overlay?token=…`);
+          if (cfg.kickOfficial.enabled) {
+            log.info(`official Kick webhook ENABLED at ${cfg.kickOfficial.webhookPath}`);
+          }
           resolve();
         });
       });
@@ -164,6 +185,24 @@ export function createServer(hub: Hub, cfg: AppConfig, store: Store): AppServer 
       return addr && typeof addr === "object" ? addr.port : cfg.port;
     },
   };
+}
+
+/** Read a request body as raw bytes (needed for webhook signature verification). */
+function readRawBody(req: http.IncomingMessage, cb: (raw: string) => void): void {
+  let data = "";
+  let size = 0;
+  let over = false;
+  req.on("data", (c: Buffer) => {
+    if (over) return;
+    size += c.length;
+    if (size > 256 * 1024) {
+      over = true;
+      return;
+    }
+    data += c;
+  });
+  req.on("end", () => cb(over ? "" : data));
+  req.on("error", () => cb(""));
 }
 
 function serveStatic(root: string, pathname: string, res: http.ServerResponse): void {

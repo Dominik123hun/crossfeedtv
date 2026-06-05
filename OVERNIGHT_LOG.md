@@ -151,3 +151,35 @@
 - **Files:** `README.md`.
 - **Tests:** unchanged; **57 passing**.
 - **Review:** none required.
+
+### Item 7 — Official Kick adapter groundwork (feature-flagged, OFF by default)
+- **What:** Added `src/ingesters/kick-official.ts` — a SEPARATE official-API path
+  (OAuth 2.1 + webhooks) alongside the untouched working WS/Pusher ingester. The
+  **security-critical webhook signature verification** (RSA-SHA256) and the
+  `chat.message.sent` → NormalizedMessage mapping are fully implemented; OAuth +
+  event-subscription are structured stubs with clear `TODO(kick-official)` markers.
+- **Wiring (inert by default):** config `kickOfficial` (env `KICK_OFFICIAL_*`,
+  default `enabled=false`); a guarded webhook route in `server.ts` mounted ONLY
+  when enabled; one additive `Hub.injectExternal()` to route a verified message
+  to subscribers like any other. With the flag off, the route 404s and nothing
+  changes.
+- **Tested:** signature verify (valid / tampered / wrong-key / garbage — all via a
+  self-generated keypair); event normalization; `handleKickWebhook` (200 chat /
+  403 bad sig / 503 no key / 200 ignored non-chat); **OFF-by-default 404**; and a
+  full **ENABLED end-to-end** test (signed webhook → routed to a live feed).
+- **Files:** `src/ingesters/kick-official.ts`, `src/config.ts`, `src/hub.ts`
+  (`injectExternal`), `src/server.ts` (guarded route + raw-body reader),
+  `.env.example`, `RECON.md`, `test/kick-official.test.ts`, `test/helpers.ts`.
+- **Tests:** build green; `npm test` = **64 passing**.
+
+#### ▶ Enabling the official Kick adapter (what a human must do)
+1. Register a Kick app → set `KICK_CLIENT_ID` / `KICK_CLIENT_SECRET`.
+2. Expose a public HTTPS URL mapping to `KICK_WEBHOOK_PATH` (default
+   `/webhooks/kick`) → set `KICK_WEBHOOK_PUBLIC_URL`.
+3. Set `KICK_EVENT_PUBLIC_KEY` to Kick's event-signing public key (PEM).
+4. Implement the two stubs (`exchangeCodeForToken`, `subscribeToChatEvents`) and
+   complete OAuth 2.1 (PKCE) + a `chat.message.sent` subscription to your URL.
+5. Confirm the `TODO(kick-official)` items against Kick's current docs (endpoint
+   URLs, **signed-content format** — repo assumes `messageId.timestamp.rawBody` —,
+   `Kick-Event-*` header names, payload field names).
+6. Set `KICK_OFFICIAL_ENABLED=true` and restart. See RECON.md for details.
