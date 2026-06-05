@@ -213,8 +213,28 @@ Host the backend on a public URL and a streamer only pastes an overlay link into
 OBS — no install, no local backend. The Hub spins up ingesters **on demand** from
 the overlay's query params, so one deployment serves everyone.
 
-A `Dockerfile` and `render.yaml` are included. The image is light (the optional
-Kick/Puppeteer deps are skipped — Kick uses the built-in Pusher fallback).
+A `Dockerfile`, `render.yaml`, and `railway.json` are included. The image is light
+(the optional Kick/Puppeteer deps are skipped — Kick uses the built-in Pusher
+fallback).
+
+> **Persisting accounts (important):** the user/session store is a file under
+> `DATA_DIR`. Container filesystems are **ephemeral** — without a persistent
+> volume, accounts are wiped on every redeploy. Attach a volume (below). The
+> store interface is swappable, so you can move to Postgres later without app
+> changes.
+
+**Railway (recommended — with a persistent volume):**
+1. New project → **Deploy from GitHub repo**. Railway detects the `Dockerfile`,
+   injects `PORT`, and gives an HTTPS URL with WebSocket support.
+2. **Add a Volume** to the service and set its **mount path to `/app/data`**
+   (Railway → service → **Variables/Volumes** → New Volume). The app uses the
+   volume automatically (it reads `RAILWAY_VOLUME_MOUNT_PATH`, and the container
+   fixes ownership on boot so it works even though volumes mount root-owned).
+3. Overlay URL: `https://<your-app>.up.railway.app/overlay?token=…` (per-user) or
+   `…/overlay.html?twitch=xqc` (direct).
+
+   _Verify it persisted: redeploy, then confirm your account still logs in. You
+   can also check `GET /healthz`._
 
 **Render (Blueprint):**
 1. Push this repo to GitHub.
@@ -227,13 +247,14 @@ Kick/Puppeteer deps are skipped — Kick uses the built-in Pusher fallback).
    Give that URL to streamers; they add it as an OBS **Browser Source** (≈460×900,
    transparent). That's it.
 
-**Railway:** New project → **Deploy from GitHub repo**. Railway auto-detects the
-`Dockerfile`, injects `PORT`, and gives an HTTPS URL with WebSocket support.
+> On Render, do the same with a **Disk** mounted at `/app/data` (Render →
+> service → Disks) so accounts survive deploys.
 
 **Any Docker host:**
 ```bash
 docker build -t crossfeedtv .
-docker run -p 8080:8080 crossfeedtv
+# -v persists accounts across restarts; the container fixes ownership on boot.
+docker run -p 8080:8080 -v crossfeed-data:/app/data crossfeedtv
 ```
 Put it behind a TLS reverse proxy (e.g. Caddy for automatic HTTPS) so the overlay
 can use `wss://` — OBS (Chromium) requires secure WebSockets on an HTTPS page. The

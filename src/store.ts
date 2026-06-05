@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { logger } from "./logger";
 import { DEFAULT_OVERLAY_SETTINGS, type OverlaySettings } from "./types";
 import { randomId } from "./util";
 
@@ -191,8 +192,16 @@ export function createStore(dataDir: string): Store {
 }
 
 function load(file: string): DBShape {
+  if (!fs.existsSync(file)) return { users: {}, sessions: {} };
+  let raw: string;
   try {
-    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as Partial<DBShape>;
+    raw = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    logger.child("store").error(`could not read ${file}`, err);
+    return { users: {}, sessions: {} };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<DBShape>;
     const users = parsed.users ?? {};
     // Migrate any user records that predate overlay settings.
     for (const user of Object.values(users)) {
@@ -200,6 +209,15 @@ function load(file: string): DBShape {
     }
     return { users, sessions: parsed.sessions ?? {} };
   } catch {
+    // The file exists but is corrupt. Do NOT silently start empty (the next write
+    // would overwrite it) — preserve a forensic copy first, then start fresh.
+    const backup = `${file}.corrupt-${Date.now()}`;
+    try {
+      fs.renameSync(file, backup);
+      logger.child("store").error(`corrupt data file; backed up to ${backup} and started fresh`);
+    } catch (err) {
+      logger.child("store").error(`corrupt data file and could not back it up`, err);
+    }
     return { users: {}, sessions: {} };
   }
 }

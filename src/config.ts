@@ -181,7 +181,12 @@ export function loadConfig(): AppConfig {
       connectTimeoutMs: int(process.env.RECONNECT_CONNECT_TIMEOUT_MS, 15000),
     },
     logLevel: (str(process.env.LOG_LEVEL) as LogLevel) ?? "info",
-    dataDir: str(process.env.DATA_DIR) ?? path.resolve(__dirname, "..", "data"),
+    // Persisted data lives here. On Railway, attach a Volume and we use its mount
+    // path automatically (RAILWAY_VOLUME_MOUNT_PATH) unless DATA_DIR is set.
+    dataDir:
+      str(process.env.DATA_DIR) ??
+      str(process.env.RAILWAY_VOLUME_MOUNT_PATH) ??
+      path.resolve(__dirname, "..", "data"),
     sessionTtlMs: int(process.env.SESSION_TTL_MS, 30 * 24 * 60 * 60 * 1000),
     cookieSecure:
       process.env.COOKIE_SECURE === undefined ? undefined : bool(process.env.COOKIE_SECURE),

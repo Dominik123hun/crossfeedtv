@@ -86,6 +86,25 @@ test("sessions: create/get/delete and expiry", () => {
   assert.equal(store.getSession(expired.id), undefined, "expired session must not resolve");
 });
 
+test("a corrupt data file is backed up (not silently wiped) and the store still opens", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cf-store-"));
+  const s1 = createStore(dir);
+  s1.createUser("h@test.com", "h", "s");
+  const file = path.join(dir, "crossfeed-db.json");
+  // Corrupt the file on disk.
+  fs.writeFileSync(file, "{ this is not valid json ");
+
+  // Reopening must not throw, and must preserve a forensic backup.
+  const s2 = createStore(dir);
+  assert.equal(s2.getUserByEmail("h@test.com"), undefined, "starts fresh after corruption");
+  const backups = fs.readdirSync(dir).filter((f) => f.startsWith("crossfeed-db.json.corrupt-"));
+  assert.equal(backups.length, 1, "corrupt file should be backed up, not deleted");
+
+  // And the fresh store is usable + persists again.
+  const u = s2.createUser("i@test.com", "h", "s");
+  assert.equal(createStore(dir).getUserById(u.id)?.email, "i@test.com");
+});
+
 test("persistence survives reopening the store (and migrates missing settings)", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "cf-store-"));
   const s1 = createStore(dir);
