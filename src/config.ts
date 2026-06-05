@@ -32,10 +32,16 @@ export interface KickConfig {
  *             the scalable path for 20+ chats
  *   auto    — pick the first of the above that's configured
  */
-export type XMode = "auto" | "static" | "http" | "browser";
+export type XMode = "auto" | "static" | "http" | "browser" | "periscope";
 
 export interface XConfig {
+  /** BETA feature flag. X (unofficial Periscope chat) is OFF unless X_ENABLED=true. */
+  enabled: boolean;
   mode: XMode;
+  /** Periscope API base host (X_API_BASE); defaults to the public pscp.tv host. */
+  apiBase?: string;
+  /** Optional guest/auth token for gated broadcasts (TODO recon). */
+  guestToken?: string;
   /** static: a chat socket URL captured directly from DevTools. */
   chatWsUrl?: string;
   /** static: an access token captured directly from DevTools. */
@@ -170,7 +176,11 @@ export function loadConfig(): AppConfig {
       readyTimeoutMs: int(process.env.KICK_READY_TIMEOUT_MS, 20000),
     },
     x: {
+      // BETA: X is unofficial (Periscope) and OFF unless explicitly enabled.
+      enabled: bool(process.env.X_ENABLED),
       mode: (str(process.env.X_MODE) as XMode) ?? "auto",
+      apiBase: str(process.env.X_API_BASE),
+      guestToken: str(process.env.X_GUEST_TOKEN),
       chatWsUrl: str(process.env.X_CHAT_WS_URL),
       accessToken: str(process.env.X_ACCESS_TOKEN),
       accessUrl: str(process.env.X_ACCESS_URL),

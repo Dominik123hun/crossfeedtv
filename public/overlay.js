@@ -276,7 +276,8 @@
       dot = document.createElement("span");
       dot.className = "dot";
       const label = document.createElement("span");
-      label.textContent = name === "ws" ? "feed" : name;
+      // X is unofficial/experimental — flag it in the status HUD.
+      label.textContent = name === "ws" ? "feed" : name === "x" ? "x · beta" : name;
       chip.appendChild(dot);
       chip.appendChild(label);
       statusEl.appendChild(chip);
@@ -355,7 +356,8 @@
       '<div class="card"><h1>CrossFeed.tv overlay</h1>' +
       "<div>No channels configured. Add them as query params:</div>" +
       "<div style=\"margin-top:10px\"><code>?twitch=xqc&amp;kick=xqc&amp;x=&lt;broadcastId&gt;</code></div>" +
-      '<div class="muted">This hint disappears once messages arrive and is never shown when a channel is set.</div></div>';
+      '<div class="muted">X is experimental / beta (unofficial, may break). ' +
+      "This hint disappears once messages arrive and is never shown when a channel is set.</div></div>";
     hintEl.classList.remove("hidden");
   }
 

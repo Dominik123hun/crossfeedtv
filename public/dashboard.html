@@ -56,7 +56,7 @@
                   <span class="state" id="state-kick">…</span>
                 </div>
                 <div class="status-row" data-platform="x">
-                  <span class="pill x">X</span>
+                  <span class="pill x">X <span class="beta-tag">beta</span></span>
                   <span class="dot" id="dot-x"></span>
                   <span class="state" id="state-x">…</span>
                 </div>
@@ -78,9 +78,13 @@
                   <span class="hint">Your Kick channel slug.</span>
                 </div>
                 <div class="channel-row">
-                  <span class="pill x" id="pillX">X</span>
-                  <input class="input" id="xInput" aria-label="X broadcast id" placeholder="broadcast id" autocomplete="off" />
-                  <span class="hint">The id of your live X broadcast.</span>
+                  <span class="pill x" id="pillX">X <span class="beta-tag">beta</span></span>
+                  <input class="input" id="xInput" aria-label="X broadcast id" placeholder="broadcast id or x.com/i/broadcasts/… URL" autocomplete="off" />
+                  <span class="hint">
+                    Your live X broadcast id (or paste the <code>x.com/i/broadcasts/…</code> URL).
+                    <strong>Experimental / beta — unofficial, best-effort, may break.</strong>
+                    Off unless the server has <code>X_ENABLED</code> set.
+                  </span>
                 </div>
                 <div class="channels-actions">
                   <button class="btn btn-primary" type="submit" id="saveBtn">Save channels</button>

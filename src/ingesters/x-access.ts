@@ -1,5 +1,6 @@
 import type { XConfig, XMode } from "../config";
 import type { Logger } from "../logger";
+import { chatWsUrl, getChatAccess, resolveBroadcast } from "./x-periscope";
 
 /* ───────────────────────────────────────────────────────────────────────────
    X chat ACCESS layer — the scalable part of the design.
@@ -233,6 +234,29 @@ class BrowserAccessProvider implements XAccessProvider {
   }
 }
 
+/**
+ * Default provider: the real public pscp.tv (Periscope) handshake — no login.
+ * resolveBroadcast(id) → getChatAccess(chatToken) → { wss endpoint, access token }.
+ * This is what makes a public X broadcast work out of the box (behind X_ENABLED).
+ */
+class PeriscopeAccessProvider implements XAccessProvider {
+  readonly name = "periscope";
+  constructor(
+    private readonly cfg: XConfig,
+    private readonly ttlMs: number,
+    private readonly log: Logger,
+  ) {}
+
+  async getAccess(broadcastId: string): Promise<XAccess> {
+    const opts = { apiBase: this.cfg.apiBase, guestToken: this.cfg.guestToken };
+    const { chatToken } = await resolveBroadcast(broadcastId, opts);
+    const { endpoint, accessToken } = await getChatAccess(chatToken, opts);
+    this.log.debug(`periscope access ok for ${broadcastId}`);
+    return { chatWsUrl: chatWsUrl(endpoint), accessToken, expiresAt: Date.now() + this.ttlMs };
+  }
+  close(): void {}
+}
+
 /** Returned when nothing is configured — fails with actionable guidance. */
 class UnconfiguredProvider implements XAccessProvider {
   readonly name = "unconfigured";
@@ -259,7 +283,8 @@ function resolveMode(cfg: XConfig): XMode {
   if (cfg.chatWsUrl && cfg.accessToken) return "static";
   if (cfg.accessUrl) return "http";
   if (cfg.authTokenCookie && cfg.csrfToken) return "browser";
-  return "static"; // → UnconfiguredProvider below
+  // Default: the real public Periscope handshake (no creds needed for public broadcasts).
+  return "periscope";
 }
 
 export function createXAccessProvider(cfg: XConfig, log: Logger): XAccessProvider {
@@ -273,7 +298,9 @@ export function createXAccessProvider(cfg: XConfig, log: Logger): XAccessProvide
       return new HttpAccessProvider(cfg, cfg.tokenTtlMs, log);
     case "browser":
       return new BrowserAccessProvider(cfg, cfg.tokenTtlMs, log);
+    case "periscope":
+      return new PeriscopeAccessProvider(cfg, cfg.tokenTtlMs, log);
     default:
-      return new UnconfiguredProvider();
+      return new PeriscopeAccessProvider(cfg, cfg.tokenTtlMs, log);
   }
 }

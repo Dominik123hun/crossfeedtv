@@ -120,6 +120,20 @@
 .field-link:hover {
   color: var(--text);
 }
+
+/* "beta" marker on the experimental X source. */
+.beta-tag {
+  font-family: var(--mono);
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  opacity: 0.85;
+  margin-left: 0.35em;
+  padding: 0 0.32em;
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.18);
+}
 .auth-foot {
   margin-top: 20px;
   text-align: center;

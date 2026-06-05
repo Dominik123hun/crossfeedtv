@@ -1,50 +1,56 @@
-import WebSocket from "ws";
+import type WebSocket from "ws";
 import type { AppConfig } from "../config";
 import type { Logger } from "../logger";
 import type { Platform } from "../types";
 import { BaseIngester, type IngesterEvents } from "./base";
 import type { XAccess, XAccessManager } from "./x-access";
+import { connectChat, parseBroadcastId } from "./x-periscope";
 import { normalizeXMessage, type RawXMessage } from "./x-normalize";
 
 /* ───────────────────────────────────────────────────────────────────────────
-   X broadcast chat ingester — the cheap, scalable consumer.
+   X (Twitter) broadcast chat ingester — EXPERIMENTAL / BETA, unofficial.
 
-   It does NOT authenticate itself. It asks the shared XAccessManager for
-   { chatWsUrl, accessToken } (cached/minted/refreshed centrally), opens one raw
-   WebSocket, sends a subscribe frame, and parses chat frames into the normalized
-   schema. So 20+ X chats = 20+ light sockets sharing one token-minter.
+   X has no official broadcast-chat API; this replicates the public pscp.tv
+   (Periscope) handshake the web player uses. It is a cheap consumer: it asks the
+   shared XAccessManager for { chatWsUrl, accessToken } (the manager runs the
+   resolve→access handshake, caches/refreshes centrally), opens one WebSocket,
+   sends the auth + join frames, and parses chat frames into the normalized
+   schema. 20+ X chats = 20+ light sockets over one shared access manager.
 
-   Token expiry shows up as a socket close; we invalidate the cached token so the
-   next (backed-off) attempt re-mints. The subscribe frame shape is UNKNOWN —
-   TODO_X_SUBSCRIBE_FRAME (overridable via X_SUBSCRIBE_FRAME). See RECON.md.
+   A socket close usually means the access token expired → we invalidate the
+   cached token so the next (backed-off) attempt re-mints. See RECON.md / the
+   beta flag (X_ENABLED) in config.
    ─────────────────────────────────────────────────────────────────────────── */
 
-// TODO(recon): the frame the client sends to subscribe after connecting.
-// {token}/{broadcastId} are substituted. UNKNOWN shape.
-const TODO_X_SUBSCRIBE_FRAME =
-  '{"kind":1,"payload":{"access_token":"{token}","room":"{broadcastId}"}}';
+/** Burst guard: drop chat frames above this rate (per ingester). Beta safety net. */
+const MAX_MSGS_PER_SEC = 60;
 
 export class XIngester extends BaseIngester {
   readonly platform: Platform = "x";
 
+  /** The pscp.tv broadcast id (parsed out of a URL if the user pasted one). */
   private readonly broadcastId: string;
   private readonly access: XAccessManager;
-  private readonly subscribeFrame: string;
+  private readonly subscribeFrameOverride?: string;
   private ws?: WebSocket;
   /** Attempt token: bumped on every (re)connect/disconnect to ignore stale async work. */
   private seq = 0;
 
+  // Burst guard window.
+  private windowStart = 0;
+  private inWindow = 0;
+
   constructor(
-    broadcastId: string,
+    channel: string,
     cfg: AppConfig,
     log: Logger,
     events: IngesterEvents,
     access: XAccessManager,
   ) {
-    super(broadcastId, cfg.reconnect, log, events);
-    this.broadcastId = broadcastId;
+    super(channel, cfg.reconnect, log, events);
+    this.broadcastId = parseBroadcastId(channel) ?? channel;
     this.access = access;
-    this.subscribeFrame = cfg.x.subscribeFrame || TODO_X_SUBSCRIBE_FRAME;
+    this.subscribeFrameOverride = cfg.x.subscribeFrame || undefined;
   }
 
   protected doConnect(): void {
@@ -52,15 +58,19 @@ export class XIngester extends BaseIngester {
     this.access
       .get(this.broadcastId)
       .then((access) => {
-        if (my === this.seq) this.connectChat(access);
+        if (my === this.seq) this.openChat(access);
       })
       .catch((err: { message?: string }) => {
-        if (my === this.seq) this.onClosed(err?.message || String(err));
+        if (my !== this.seq) return;
+        const detail = err?.message || String(err);
+        // Surface a clean error, then back off (BaseIngester handles the retry).
+        this.onError(detail);
+        this.onClosed(detail);
       });
   }
 
   protected doDisconnect(): void {
-    // Bump seq so any in-flight getAccess/connect for this attempt is ignored.
+    // Bump seq so any in-flight get()/connect for this attempt is ignored.
     this.seq++;
     const ws = this.ws;
     this.ws = undefined;
@@ -74,28 +84,20 @@ export class XIngester extends BaseIngester {
     }
   }
 
-  private connectChat(access: XAccess): void {
-    const ws = new WebSocket(access.chatWsUrl);
-    this.ws = ws;
-
-    ws.on("open", () => {
-      const frame = this.subscribeFrame
-        .replace("{token}", access.accessToken)
-        .replace("{broadcastId}", this.broadcastId);
-      try {
-        ws.send(frame);
-      } catch {
-        /* socket may have closed already */
-      }
-      this.onConnected();
-    });
-
-    ws.on("message", (data: WebSocket.RawData) => this.handleFrame(data.toString()));
-    ws.on("error", (e: Error) => this.onError(e.message));
-    ws.on("close", (code: number) => {
-      // A close often means the token expired — drop it so the next attempt re-mints.
-      this.access.invalidate(this.broadcastId);
-      this.onClosed(`x socket closed (${code})`);
+  private openChat(access: XAccess): void {
+    this.ws = connectChat({
+      wsUrl: access.chatWsUrl,
+      accessToken: access.accessToken,
+      broadcastId: this.broadcastId,
+      subscribeFrameOverride: this.subscribeFrameOverride,
+      onOpen: () => this.onConnected(),
+      onMessage: (raw) => this.handleFrame(raw),
+      onError: (e) => this.onError(e.message),
+      onClose: (code) => {
+        // A close often means the token expired — drop it so the next attempt re-mints.
+        this.access.invalidate(this.broadcastId);
+        this.onClosed(`x socket closed (${code})`);
+      },
     });
   }
 
@@ -104,10 +106,25 @@ export class XIngester extends BaseIngester {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      return;
+      return; // non-JSON / control frame
     }
-    // TODO(recon): handle heartbeat/control frames if the protocol needs a pong.
     const msg = normalizeXMessage(parsed as RawXMessage, this.broadcastId);
-    if (msg) this.emit(msg);
+    if (!msg) return; // hearts / joins / DMs / acks — ignored, never crash
+    if (this.overBurstLimit()) return;
+    this.emit(msg);
+  }
+
+  /** Simple per-second cap so a misbehaving/unofficial source can't flood the feed. */
+  private overBurstLimit(): boolean {
+    const now = Date.now();
+    if (now - this.windowStart >= 1000) {
+      this.windowStart = now;
+      this.inWindow = 0;
+    }
+    this.inWindow += 1;
+    if (this.inWindow === MAX_MSGS_PER_SEC + 1) {
+      this.log.warn(`x burst over ${MAX_MSGS_PER_SEC}/s — dropping excess (#${this.channel})`);
+    }
+    return this.inWindow > MAX_MSGS_PER_SEC;
   }
 }

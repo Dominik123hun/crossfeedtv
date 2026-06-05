@@ -15,6 +15,7 @@ import {
 } from "./auth";
 import { logger } from "./logger";
 import { RateLimiter } from "./rate-limit";
+import { parseBroadcastId } from "./ingesters/x-periscope";
 
 const log = logger.child("api");
 const MAX_BODY = 64 * 1024;
@@ -190,7 +191,8 @@ async function route(
       const channels: UserChannels = {
         twitch: sanitizeChannel(body.twitch),
         kick: sanitizeChannel(body.kick),
-        x: sanitizeChannel(body.x),
+        // X accepts a bare broadcast id OR an x.com/i/broadcasts/<id> URL.
+        x: parseBroadcastId(typeof body.x === "string" ? body.x : undefined),
       };
       const updated = store.updateChannels(user.id, channels) ?? user;
       hub.resubscribe(user.id, updated.channels);

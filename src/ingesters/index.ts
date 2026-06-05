@@ -3,6 +3,7 @@ import { TwitchEmoteResolver } from "../emotes";
 import type { IngesterFactory } from "../hub";
 import { logger } from "../logger";
 import type { Platform } from "../types";
+import type { Ingester } from "./base";
 import { KickIngester } from "./kick";
 import { TwitchIngester } from "./twitch";
 import { PooledTwitchIngester, TwitchPool } from "./twitch-pool";
@@ -54,6 +55,20 @@ function getXAccess(cfg: AppConfig): XAccessManager {
   return xAccess;
 }
 
+/**
+ * Inert ingester used when a platform is behind an off feature flag (X beta).
+ * It registers in the Hub (so the dashboard shows the source) but never connects,
+ * so the status simply stays "idle".
+ */
+class DisabledIngester implements Ingester {
+  constructor(
+    readonly platform: Platform,
+    readonly channel: string,
+  ) {}
+  start(): void {}
+  stop(): void {}
+}
+
 /** Release shared resources (Twitch pool, X browser token-minter) on shutdown. */
 export function closeSharedResources(): void {
   twitchPool?.close();
@@ -68,5 +83,9 @@ export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
       ? new PooledTwitchIngester(channel, getTwitchPool(cfg), events)
       : new TwitchIngester(channel, cfg.reconnect, log, events, cfg.twitch.wsUrl, twitchEmotes),
   kick: (channel, cfg, log, events) => new KickIngester(channel, cfg, log, events),
-  x: (channel, cfg, log, events) => new XIngester(channel, cfg, log, events, getXAccess(cfg)),
+  // X is BETA + unofficial — only connects when X_ENABLED=true; otherwise inert.
+  x: (channel, cfg, log, events) =>
+    cfg.x.enabled
+      ? new XIngester(channel, cfg, log, events, getXAccess(cfg))
+      : new DisabledIngester("x", channel),
 };

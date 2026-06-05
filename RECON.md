@@ -92,88 +92,83 @@ names** (`Kick-Event-*`), and the **payload field names** in `chat.message.sent`
 
 ---
 
-## X (Twitter) broadcasts
+## X (Twitter) broadcasts — EXPERIMENTAL / BETA (unofficial)
 
-The X broadcast (ex-Periscope) chat protocol is **not** in the documented X API.
-The ingester in [`src/ingesters/x.ts`](./src/ingesters/x.ts) ships with the
-correct **structure** — `getAccess() → { chatWsUrl, accessToken }` then
-`connectChat()` (open socket → subscribe → parse) — and every unknown value as a
-clearly named `TODO_X_*` constant. Your job is to capture the real values and
-either edit those constants or set the matching env vars. **Nothing here is a
-real endpoint or token.**
+X has **no official** broadcast-chat API; broadcasts still run on the legacy
+**Periscope (pscp.tv)** backend. The ingester now implements the **real public
+handshake** the web player uses, as three testable functions in
+[`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts):
 
-### Step A — open a live broadcast with DevTools recording
+1. `resolveBroadcast(id)` → `GET https://proxsee.pscp.tv/api/v2/accessVideoPublic?broadcast_id={id}&replay_redirect=false` → `chat_token`
+2. `getChatAccess(chatToken)` → `GET https://proxsee.pscp.tv/api/v2/accessChatPublic?chat_token={chat_token}` → `{ endpoint, access_token }`
+3. `connectChat({ wsUrl, accessToken, broadcastId })` → open `wss://{endpoint}/chatapi/v1/chatnow`, send the **auth** then **join** frame, parse `{ kind, payload }` frames.
 
-1. In Chrome, open a **currently-live** broadcast on `x.com` (a Space/broadcast
-   with chat). Keep the tab focused so chat loads.
-2. Open DevTools (`F12`) **before/at** load → **Network** → enable **Preserve log**.
+These endpoints, field names, the `wss` path, and the auth/join frame shapes were
+taken from the live-reader references — **IgnatBeresnev/periscope-chat-downloader**
+(the `accessVideoPublic → chat_token`, `accessChatPublic → {endpoint, access_token}`
+flow) and **jferas/ScopeSpeaker** (the `…/chatapi/v1/chatnow` wss path and the
+exact `kind:3` auth + `kind:2` join frames). They are unofficial and can change —
+this section is how to **verify/refresh** them, and how to handle gated broadcasts.
 
-### Step B — find the chat WebSocket (→ `chatWsUrl`)
+### Beta flag (required to turn it on)
 
-1. **Network** → **WS** filter.
-2. Look for a socket that is clearly chat (not analytics): its **Messages** tab
-   shows a steady stream of chat-shaped frames as people type.
-3. Copy its full `wss://…` URL → this is **`chatWsUrl`** (`X_CHAT_WS_URL`).
+X is **OFF by default**. The dashboard and overlay label it
+"experimental / beta (unofficial, may break)". To enable the backend connection:
 
-### Step C — find the access XHR just before it (→ `accessToken` + URL)
+```
+X_ENABLED=true
+```
 
-1. In **Network**, sort by time and look at the **XHR/Fetch** requests that fire
-   **immediately before** that WS opens. One of them grants chat access.
-2. Open it → **Response/Preview**. You're looking for a JSON body containing:
-   - a **socket/endpoint URL** field → maps to `chatWsUrl`
-   - an **access token** field → maps to `accessToken`
-3. Note its **Request URL** (→ `X_ACCESS_URL`, with the broadcast id swapped for
-   `{broadcastId}`) and the **Authorization: Bearer …** request header
-   (→ `X_AUTH_BEARER`).
+A user enters a **broadcast id** or pastes the `x.com/i/broadcasts/<id>` URL
+(the id is parsed out). For a quick single-broadcast smoke test you can also set
+`X_BROADCAST_ID` and run with `X_ENABLED=true`.
 
-### Step D — read the subscribe + message frames
+### If it breaks — verify the handshake in DevTools
 
-1. Back on the WS **Messages** tab, find the **first client→server** frame after
-   connect — that's the **subscribe** frame.
-2. Find an incoming **chat** frame and note which fields hold the text, author,
-   color, id, and timestamp (frames may be **double-encoded** — a JSON string
-   inside a `payload`/`body` field; the normalizer already tries to unwrap one
-   level).
+1. Open a **currently-live** broadcast on `x.com` → DevTools (`F12`) → **Network**
+   → enable **Preserve log**.
+2. **Resolve:** find the `accessVideoPublic` (or equivalent) XHR → **Response** →
+   confirm the field that carries the chat token is still `chat_token`. If the
+   host changed, set `X_API_BASE` (default `https://proxsee.pscp.tv/api/v2`).
+   If a **guest token** / `Authorization` header is now required, capture it →
+   `X_GUEST_TOKEN` (the `TODO(recon)` auth header in `x-periscope.ts`).
+3. **Access:** find `accessChatPublic` → **Response** → confirm `endpoint` and
+   `access_token`.
+4. **WebSocket:** **WS** filter → open the chat socket → confirm the URL is the
+   `endpoint` host + `/chatapi/v1/chatnow` (https→wss). On the **Messages** tab,
+   the **first two client→server** frames are the auth (`{"kind":3,…}`) then join
+   (`{"kind":2,…}`). If they differ, set a single replacement via
+   `X_SUBSCRIBE_FRAME` (sent verbatim instead of auth+join).
+5. **Chat frames:** an incoming chat frame is `{ "kind":1, "payload":"…json…" }`.
+   Decode `payload`: `payload.body` is a JSON string whose `.body` is the message
+   text; `payload.sender` is a JSON string with `username` / `display_name`.
+   Confirm the still-`TODO(recon)` keys in
+   [`x-normalize.ts`](./src/ingesters/x-normalize.ts): `SENDER_COLOR`, `PAYLOAD_ID`
+   (`uuid`?), `PAYLOAD_TS` (timestamp + units).
 
-### Step E — pick a mode and plug the values in
+### Env vars
 
-Set `X_MODE` (or leave `auto`, which picks the first configured). The access
-provider is shared across all X chats; each chat is a cheap raw WebSocket, so
-this scales to many broadcasts at once.
+| Env var            | Meaning                                                            |
+| ------------------ | ----------------------------------------------------------------- |
+| `X_ENABLED`        | Beta flag — must be `true` for X to connect (default off).        |
+| `X_API_BASE`       | Periscope API base (default `https://proxsee.pscp.tv/api/v2`).    |
+| `X_GUEST_TOKEN`    | Optional bearer for **gated** broadcasts (TODO recon header).     |
+| `X_BROADCAST_ID`   | A broadcast id to connect on startup (or use the dashboard).      |
+| `X_SUBSCRIBE_FRAME`| Override the on-open frame(s) if the protocol changes.            |
 
-**`static`** — one broadcast, no auth replication. Paste captured values:
+### Still-`TODO(recon)` constants
 
-| Captured (DevTools)            | Env var          |
-| ------------------------------ | ---------------- |
-| chat `wss://…` URL             | `X_CHAT_WS_URL`  |
-| access token from the XHR body | `X_ACCESS_TOKEN` |
-| broadcast id (from the URL)    | `X_BROADCAST_ID` |
+| Constant (file)                         | Meaning / how to confirm                          |
+| --------------------------------------- | ------------------------------------------------- |
+| `guestToken` header (`x-periscope.ts`)  | exact auth header for gated broadcasts            |
+| `SENDER_COLOR` (`x-normalize.ts`)       | sender color key, if X sends one                  |
+| `PAYLOAD_ID` (`x-normalize.ts`)         | stable per-message id key (assumed `uuid`)        |
+| `PAYLOAD_TS` (`x-normalize.ts`)         | timestamp key + units (assumed ms)                |
 
-**`http`** — backend re-fetches access (auto-refreshes the token):
+### Legacy access overrides (still supported)
 
-| Captured (DevTools)                      | Env var          |
-| ---------------------------------------- | ---------------- |
-| access XHR URL (id → `{broadcastId}`)    | `X_ACCESS_URL`   |
-| `Authorization: Bearer …` header         | `X_AUTH_BEARER`  |
-| `auth_token` cookie / `ct0` cookie       | `X_AUTH_TOKEN` / `X_CSRF` |
-
-**`browser`** — the scalable path for **20+ chats**. One Puppeteer session
-(logged in via your captured cookies) opens each broadcast and captures the
-access XHR response, so X handles auth + token refresh for you. Needs
-`npm i puppeteer`. Capture from DevTools → Application → Cookies on `x.com`:
-
-| Captured            | Env var         |
-| ------------------- | --------------- |
-| `auth_token` cookie | `X_AUTH_TOKEN`  |
-| `ct0` cookie        | `X_CSRF`        |
-
-Then confirm the placeholders match what you observed:
-
-| Constant (file)                                    | Meaning                                       |
-| -------------------------------------------------- | --------------------------------------------- |
-| `TODO_X_BROADCAST_URL` (`x-access.ts`)             | live broadcast page URL pattern (browser mode)|
-| `TODO_X_ACCESS_RESPONSE_MATCHER` (`x-access.ts`)   | how to recognize the access XHR (browser mode)|
-| `TODO_X_ACCESS_WS_FIELD` (`x-access.ts`)           | response field holding the socket URL         |
-| `TODO_X_ACCESS_TOKEN_FIELD` (`x-access.ts`)        | response field holding the access token       |
-| `TODO_X_SUBSCRIBE_FRAME` (`x.ts`, or `X_SUBSCRIBE_FRAME`) | client→server subscribe frame shape    |
-| `TODO_X_FIELD.*` (`x-normalize.ts`)                | chat-frame field names (text/author/color/id/ts) |
+The shared `XAccessManager` defaults to the public `periscope` provider above,
+but the earlier `static` / `http` / `browser` providers remain for captured
+values or a logged-in Puppeteer token-minter — set `X_MODE` plus the matching
+`X_CHAT_WS_URL`/`X_ACCESS_TOKEN`, `X_ACCESS_URL`/`X_AUTH_BEARER`, or
+`X_AUTH_TOKEN`/`X_CSRF`. (See `x-access.ts`.)

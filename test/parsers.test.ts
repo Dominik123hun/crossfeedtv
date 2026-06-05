@@ -80,15 +80,21 @@ test("normalizeKickMessage: badges/color/author, tolerant of missing identity", 
   assert.match(n2.color, /^#[0-9A-Fa-f]{6}$/);
 });
 
-test("normalizeXMessage: flat, double-encoded, control frame", () => {
-  const flat = normalizeXMessage({ uuid: "x1", username: "u", display_name: "U", color: "#1DA1F2", body: "hi", timestamp: 1780000000000 }, "bc")!;
-  assert.equal(flat.platform, "x");
-  assert.equal(flat.author, "U");
-  assert.equal(flat.text, "hi");
+test("normalizeXMessage: real Periscope chat frame + non-chat control frame", () => {
+  // Verified wire shape: { kind:1, payload:"{ sender:'…', body:'{ body:… }' }" }.
+  const sender = JSON.stringify({ username: "u", display_name: "U" });
+  const body = JSON.stringify({ body: "hi" });
+  const payload = JSON.stringify({ sender, body });
+  const chat = normalizeXMessage({ kind: 1, payload }, "bc")!;
+  assert.equal(chat.platform, "x");
+  assert.equal(chat.author, "U"); // display_name preferred
+  assert.equal(chat.text, "hi");
 
-  const nested = normalizeXMessage({ payload: JSON.stringify({ uuid: "x2", username: "n", body: "nested" }) }, "bc")!;
-  assert.equal(nested.author, "n");
-  assert.equal(nested.text, "nested");
+  // Username fallback when no display name.
+  const noDisplay = JSON.stringify({ sender: JSON.stringify({ username: "n" }), body: JSON.stringify({ body: "nested" }) });
+  const fb = normalizeXMessage({ kind: 1, payload: noDisplay }, "bc")!;
+  assert.equal(fb.author, "n");
+  assert.equal(fb.text, "nested");
 
   assert.equal(normalizeXMessage({ kind: 2, ping: true }, "bc"), null, "control frame -> null");
 });
