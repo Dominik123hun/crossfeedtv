@@ -33,15 +33,15 @@ API, so it replicates the web player's **guest-token → Periscope** handshake
 `connectChat`, see [`src/ingesters/x-periscope.ts`](./src/ingesters/x-periscope.ts))
 — behind the `X_ENABLED` flag, through a shared access manager that caches one
 guest token + per-broadcast access (scales to many chats). Probe one broadcast
-with `npm run x:probe -- <id>`. Since X has **no official API** for broadcast chat
-(confirmed) and blocks server requests, the **recommended** path is
-`X_MODE=ingest`: a userscript ([`public/crossfeed-x.user.js`](./public/crossfeed-x.user.js))
-running in the streamer's own logged-in tab scrapes the chat DOM and forwards it
-over the `/x-ingest` WebSocket, which injects it into their overlay — no API, no
-IP wall, no stored credentials. (`X_MODE=browser` — headless Chromium reading the
-WS frames — and the fetch resolver remain as alternatives.) Unofficial and may
-break; selectors/unknowns are `TODO(recon)` in [`RECON.md`](./RECON.md). Plus
-emote/pill/perf/reconnect polish.
+Since X has **no official API** for broadcast chat (confirmed) and blocks server
+requests, the **default** path is a DOM-scrape ingest: with `X_ENABLED=true` a
+userscript ([`public/crossfeed-x.user.js`](./public/crossfeed-x.user.js)) running
+in the streamer's own logged-in tab scrapes the chat DOM and forwards it over the
+`/x-ingest` WebSocket, which injects it into their overlay — no API, no IP wall,
+no stored credentials, and **no `X_MODE` to set**. (`X_MODE=browser` — headless
+Chromium reading the WS frames — and the fetch resolver, `npm run x:probe`, remain
+as opt-in alternatives.) Unofficial and may break; selectors/unknowns are
+`TODO(recon)` in [`RECON.md`](./RECON.md). Plus emote/pill/perf/reconnect polish.
 
 > **X is beta/unofficial.** It is never presented as a guaranteed source; enable
 > with `X_ENABLED=true`. The proper fix (an official API) remains a TODO, like
