@@ -177,6 +177,32 @@ handshake, and reads the chat **WebSocket frames** off the wire via CDP
 - If puppeteer/Chromium is missing it fails soft (status `error`, backs off) and
   never affects Twitch/Kick.
 
+### X DOM-scrape ingest (`X_MODE=ingest`) — RECOMMENDED, no API/IP issues
+
+Since there is **no official API** (confirmed) and X blocks server requests, the
+most reliable path is to read the chat in the **streamer's own logged-in browser**
+and forward it. A userscript scrapes the chat DOM and pushes each message to the
+`/x-ingest` WebSocket; the server authenticates by overlay token and injects it
+into that user's overlay. No X API, no IP wall, no stored credentials, scales
+per-user.
+
+Setup:
+
+1. Server: `X_ENABLED=true`, `X_MODE=ingest`; set your X broadcast id in the dashboard.
+2. Install [`public/crossfeed-x.user.js`](./public/crossfeed-x.user.js) in
+   Tampermonkey/Violentmonkey (served at `/crossfeed-x.user.js`). Edit the two
+   CONFIG values at the top: `CROSSFEED` (your origin) and `TOKEN` (your overlay token).
+3. Open your live broadcast at `x.com/i/broadcasts/<id>` and keep the tab open.
+
+If no messages arrive, the chat **selectors** have drifted — capture the real ones
+in DevTools → **Elements**: right-click a chat message → Inspect. Find (a) the
+scrolling chat **container**, (b) a single **message row**, (c) the **username**
+node, (d) the **text** node; put CSS selectors for each into `SELECTORS` in the
+userscript. The protocol-level details don't matter here — it's pure DOM reading.
+
+The matching server endpoint is `handleXIngest` in `src/server.ts` (token auth,
+sanitize, burst-guard, `hub.injectExternal`) — tested in `test/x-ingest.test.ts`.
+
 ### If it breaks — verify each step in DevTools
 
 Run `npm run x:probe -- <id>` first; it tells you which step fails. Then:

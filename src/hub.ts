@@ -378,6 +378,29 @@ export class Hub {
     this.route(keyOf(platform, channel), msg);
   }
 
+  /**
+   * Set the connection status for an externally-fed source (e.g. the X DOM-scrape
+   * ingest). Updates the entry (if present) and pushes a status frame to every
+   * client subscribed to that platform+channel.
+   */
+  setExternalStatus(platform: Platform, channel: string, state: IngesterState, info?: string): void {
+    const key = keyOf(platform, channel);
+    const entry = this.entries.get(key);
+    if (entry) {
+      entry.state = state;
+      entry.info = info;
+    }
+    const data = JSON.stringify({
+      type: "status",
+      platform,
+      state: wireState(state),
+      detail: info,
+    } satisfies ServerFrame);
+    for (const client of this.clients.values()) {
+      if (client.subs.has(key)) this.sendRaw(client.ws, data);
+    }
+  }
+
   private route(key: string, msg: NormalizedMessage): void {
     const data = JSON.stringify({ type: "chat", msg } satisfies ServerFrame);
     for (const client of this.clients.values()) {

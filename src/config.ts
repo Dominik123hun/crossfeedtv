@@ -32,7 +32,7 @@ export interface KickConfig {
  *             the scalable path for 20+ chats
  *   auto    — pick the first of the above that's configured
  */
-export type XMode = "auto" | "static" | "http" | "browser" | "periscope";
+export type XMode = "auto" | "static" | "http" | "browser" | "periscope" | "ingest";
 
 export interface XConfig {
   /** BETA feature flag. X (unofficial Periscope chat) is OFF unless X_ENABLED=true. */

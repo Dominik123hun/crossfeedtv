@@ -7,8 +7,11 @@ import type { AppConfig } from "./config";
 import { createEmailSender, type EmailSender } from "./email";
 import type { FeedSubscription, Hub } from "./hub";
 import { handleKickWebhook } from "./ingesters/kick-official";
-import { logger } from "./logger";
+import { sanitizeText } from "./ingesters/x-normalize";
+import { logger, type Logger } from "./logger";
 import type { Store } from "./store";
+import type { NormalizedMessage } from "./types";
+import { colorForName, randomId } from "./util";
 
 /** Interval between liveness pings to connected overlay clients. */
 const HEARTBEAT_MS = 30000;
@@ -182,11 +185,15 @@ export function createServer(
   }
 
   const wss = new WebSocketServer({ noServer: true });
+  // Separate socket for the X DOM-scrape ingest (browser extension/userscript → here).
+  const ingestWss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
 
   server.on("upgrade", (req, socket, head) => {
     const url = new URL(req.url || "/", "http://localhost");
     if (url.pathname === "/feed") {
       wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
+    } else if (url.pathname === "/x-ingest") {
+      ingestWss.handleUpgrade(req, socket, head, (ws) => ingestWss.emit("connection", ws, req));
     } else {
       socket.destroy();
     }
@@ -201,6 +208,8 @@ export function createServer(
     const url = new URL(req.url || "/", "http://localhost");
     hub.addClient(ws, resolveFeed(url, store));
   });
+
+  ingestWss.on("connection", (ws, req) => handleXIngest(ws, req, hub, store, log));
 
   // Ping every client periodically; terminate any that missed the last pong.
   const heartbeat = setInterval(() => {
@@ -245,6 +254,11 @@ export function createServer(
         /* ignore */
       }
       try {
+        ingestWss.close();
+      } catch {
+        /* ignore */
+      }
+      try {
         server.close();
       } catch {
         /* ignore */
@@ -273,6 +287,101 @@ function readRawBody(req: http.IncomingMessage, cb: (raw: string) => void): void
   });
   req.on("end", () => cb(over ? "" : data));
   req.on("error", () => cb(""));
+}
+
+/** Abuse guards for the X DOM-scrape ingest. */
+const X_INGEST_MAX_PER_SEC = 80;
+const X_INGEST_MAX_TEXT = 500;
+const X_INGEST_MAX_AUTHOR = 80;
+
+/**
+ * Handle a browser-side X DOM-scrape ingest connection. The userscript/extension
+ * (running in the streamer's own logged-in tab) scrapes chat nodes and sends
+ * {author,text}; we authenticate by overlay token, sanitize, and inject into the
+ * owning user's X feed. No X API and no credentials stored — their browser is the
+ * source. See public/crossfeed-x.user.js + RECON.md.
+ */
+function handleXIngest(
+  ws: WebSocket,
+  req: http.IncomingMessage,
+  hub: Hub,
+  store: Store,
+  log: Logger,
+): void {
+  const url = new URL(req.url || "/", "http://localhost");
+  const token = (url.searchParams.get("token") ?? "").trim();
+  const user = token ? store.getUserByToken(token) : undefined;
+  const broadcastId = user?.channels.x;
+  if (!user || !broadcastId) {
+    try {
+      ws.send(JSON.stringify({ type: "error", error: "invalid token or no X channel configured" }));
+    } catch {
+      /* ignore */
+    }
+    ws.close();
+    return;
+  }
+
+  hub.setExternalStatus("x", broadcastId, "connected", "browser ingest");
+  log.info(`x-ingest connected (user ${user.id.slice(0, 8)}, broadcast ${broadcastId})`);
+
+  let windowStart = 0;
+  let inWindow = 0;
+  function overLimit(): boolean {
+    const now = Date.now();
+    if (now - windowStart >= 1000) {
+      windowStart = now;
+      inWindow = 0;
+    }
+    inWindow += 1;
+    return inWindow > X_INGEST_MAX_PER_SEC;
+  }
+
+  function inject(author: unknown, text: unknown): void {
+    if (typeof author !== "string" || typeof text !== "string") return;
+    const cleanText = sanitizeText(text, X_INGEST_MAX_TEXT);
+    if (!cleanText || overLimit()) return;
+    const cleanAuthor = sanitizeText(author, X_INGEST_MAX_AUTHOR) || "anonymous";
+    const msg: NormalizedMessage = {
+      id: randomId(),
+      platform: "x",
+      channel: broadcastId!,
+      author: cleanAuthor,
+      color: colorForName(cleanAuthor),
+      badges: [],
+      text: cleanText,
+      emotes: [],
+      timestamp: Date.now(),
+    };
+    hub.injectExternal("x", broadcastId!, msg);
+  }
+
+  ws.on("message", (raw) => {
+    let frame: unknown;
+    try {
+      frame = JSON.parse(raw.toString());
+    } catch {
+      return;
+    }
+    const one = (m: { author?: unknown; text?: unknown } | null | undefined): void =>
+      inject(m?.author, m?.text);
+    if (Array.isArray(frame)) frame.forEach(one);
+    else if (frame && typeof frame === "object" && Array.isArray((frame as { batch?: unknown }).batch))
+      (frame as { batch: unknown[] }).batch.forEach((m) => one(m as { author?: unknown; text?: unknown }));
+    else if (frame && typeof frame === "object") one(frame as { author?: unknown; text?: unknown });
+  });
+
+  ws.on("close", () => {
+    hub.setExternalStatus("x", broadcastId, "stopped", "browser ingest disconnected");
+    log.info(`x-ingest closed (user ${user.id.slice(0, 8)})`);
+  });
+  ws.on("error", () => {
+    try {
+      ws.close();
+    } catch {
+      /* ignore */
+    }
+  });
 }
 
 function serveStatic(

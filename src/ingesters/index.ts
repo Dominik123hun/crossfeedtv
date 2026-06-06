@@ -91,6 +91,9 @@ export const INGESTER_FACTORIES: Partial<Record<Platform, IngesterFactory>> = {
   x: (channel, cfg, log, events) => {
     if (!cfg.x.enabled) return new DisabledIngester("x", channel);
     if (cfg.x.mode === "browser") return new XBrowserIngester(channel, cfg, log, events);
+    // ingest = no server-side connection; a browser extension/userscript scrapes
+    // the chat DOM and pushes it to /x-ingest (the channel just needs to subscribe).
+    if (cfg.x.mode === "ingest") return new DisabledIngester("x", channel);
     return new XIngester(channel, cfg, log, events, getXAccess(cfg));
   },
 };
