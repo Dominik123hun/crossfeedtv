@@ -90,12 +90,6 @@ function cleanId(id: string): string | undefined {
   return /^[A-Za-z0-9_-]{4,}$/.test(c) ? c : undefined;
 }
 
-/** True for an auth-shaped failure (so callers can refresh the guest token + retry). */
-export function isAuthError(err: unknown): boolean {
-  const m = err instanceof Error ? err.message : String(err);
-  return /HTTP (401|403)\b/.test(m);
-}
-
 /** Step 0: mint a guest token from the public bearer (best-effort; deprecated endpoint). */
 export async function getGuestToken(opts: XApiOpts = {}): Promise<string> {
   const base = opts.guestApiBase ?? GUEST_API_BASE;

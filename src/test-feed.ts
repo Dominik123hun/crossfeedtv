@@ -76,5 +76,3 @@ export function buildTestMessages(): NormalizedMessage[] {
     test: true,
   }));
 }
-
-export const TEST_MESSAGE_COUNT = SEEDS.length;

@@ -128,7 +128,6 @@ class HttpAccessProvider implements XAccessProvider {
   constructor(
     private readonly cfg: XConfig,
     private readonly ttlMs: number,
-    private readonly log: Logger,
   ) {}
 
   async getAccess(broadcastId: string): Promise<XAccess> {
@@ -332,7 +331,7 @@ export function createXAccessProvider(cfg: XConfig, log: Logger): XAccessProvide
         ? new StaticAccessProvider(cfg.chatWsUrl, cfg.accessToken, cfg.tokenTtlMs)
         : new UnconfiguredProvider();
     case "http":
-      return new HttpAccessProvider(cfg, cfg.tokenTtlMs, log);
+      return new HttpAccessProvider(cfg, cfg.tokenTtlMs);
     case "browser":
       return new BrowserAccessProvider(cfg, cfg.tokenTtlMs, log);
     case "periscope":

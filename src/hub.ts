@@ -149,7 +149,7 @@ export class Hub {
       };
       entry.ingester = factory(channel, this.cfg, logger.child(key), {
         onMessage: (msg) => this.route(key, msg),
-        onState: (state, info) => this.onIngesterState(key, platform, channel, state, info),
+        onState: (state, info) => this.onIngesterState(key, platform, state, info),
       });
       this.entries.set(key, entry);
       entry.ingester.start();
@@ -411,7 +411,6 @@ export class Hub {
   private onIngesterState(
     key: string,
     platform: Platform,
-    channel: string,
     state: IngesterState,
     info?: string,
   ): void {
